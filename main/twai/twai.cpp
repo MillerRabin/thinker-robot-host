@@ -42,7 +42,7 @@ typedef enum {
     RX_TASK_EXIT,
 } rx_task_action_t;
 
-static const twai_timing_config_t t_config = TWAI_TIMING_CONFIG_25KBITS();
+static const twai_timing_config_t t_config = TWAI_TIMING_CONFIG_1MBITS();
 static const twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 static const twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(TX_GPIO_NUM, RX_GPIO_NUM, TWAI_MODE_NORMAL);
 
@@ -102,7 +102,7 @@ static void twai_receive_task(void *arg)
         if (action == RX_RECEIVE_PING_RESP) {
             //Listen for ping response from slave
             while (1) {
-                twai_message_t rx_msg;
+                twai_message_t rx_msg;                
                 twai_receive(&rx_msg, portMAX_DELAY);
                 if (rx_msg.identifier == ID_SLAVE_PING_RESP) {
                     xSemaphoreGive(stop_ping_sem);
@@ -151,7 +151,7 @@ static void twai_transmit_task(void *arg)
 
         if (action == TX_SEND_PINGS) {
             //Repeatedly transmit pings
-            ESP_LOGI(EXAMPLE_TAG, "Transmitting ping");
+            ESP_LOGI(EXAMPLE_TAG, "Transmitting ping");            
             while (xSemaphoreTake(stop_ping_sem, 0) != pdTRUE) {
                 twai_transmit(&ping_message, portMAX_DELAY);
                 vTaskDelay(pdMS_TO_TICKS(PING_PERIOD_MS));
