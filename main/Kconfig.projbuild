@@ -20,17 +20,35 @@ menu "Thinker Robot configuration"
                 WiFi password (WPA or WPA2) for the example to use.
                 Can be left blank if the network has no security set.
         
-        config EXAMPLE_TX_GPIO_NUM
-            int "TX GPIO number"            
+        config TWAI_TX_GPIO_NUM
+            int "TWAI TX GPIO number"
             default 5
             help
                 This option selects the GPIO pin used for the TX signal. Connect the
                 TX signal to your transceiver.
             
-        config EXAMPLE_RX_GPIO_NUM
-            int "RX GPIO number"            
+        config TWAI_RX_GPIO_NUM
+            int "TWAI RX GPIO number"
             default 4
             help
                 This option selects the GPIO pin used for the RX signal. Connect the
                 RX signal to your transceiver.
+        
+        config ENGINE_PIN
+            int "Engine pin"
+            default 13
+            help
+                This options selects the GPIO pin used for engine power MOSFET
+
+        config CAMERA_PIN
+            int "Camera pin"
+            default 14
+            help
+                This options selects the GPIO pin used for camera power MOSFET
+        
+        config IMU_INT_PIN
+            int "IMU INT PIN"
+            default 17
+            help
+                This options selects the GPIO pin used for IMU interrupts
 endmenu

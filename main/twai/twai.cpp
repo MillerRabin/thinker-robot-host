@@ -17,8 +17,8 @@
 #define RX_TASK_PRIO            8
 #define TX_TASK_PRIO            9
 #define CTRL_TSK_PRIO           10
-#define TX_GPIO_NUM             gpio_num_t(CONFIG_EXAMPLE_TX_GPIO_NUM)
-#define RX_GPIO_NUM             gpio_num_t(CONFIG_EXAMPLE_RX_GPIO_NUM)
+#define TX_GPIO_NUM             gpio_num_t(CONFIG_TWAI_TX_GPIO_NUM)
+#define RX_GPIO_NUM             gpio_num_t(CONFIG_TWAI_RX_GPIO_NUM)
 #define EXAMPLE_TAG             "TWAI Master"
 
 #define ID_MASTER_STOP_CMD      0x0A0

@@ -1,27 +1,20 @@
-#include "sdkconfig.h"
-#include "driver/gpio.h"
 #include "wifi/wifi.h"
-#include "esp_netif.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "nvs_flash.h"
-#include "i2c/i2c.h"
-#include "ms5611.h"
-#include <math.h>
 #include "altitude/altitude.h"
 #include "twai/twai.h"
-
-esp_err_t start_rest_server();
-
-#define FIRST_LINE_SDA 4
-#define FIRST_LINE_SCL 5
-#define SECOND_LINE_SDA 6
-#define SECOND_LINE_SCL 7
-#define MS5561_ADDR 0x77
+#include "powerManagement/powerManagement.h"
+#include <esp_log.h>
 
 extern "C" void app_main(void)
 {    
-  twai_initialize();
+  //twai_initialize();
+  //esp_err_t start_rest_server();
+  ESP_LOGI("Main", "Init Power");
+  PowerManagement::init();
+  //ESP_LOGI("Main", "Enable camera");
+  //PowerManagement::enableCamera();
+  ESP_LOGI("Main", "Enable engines");
+  PowerManagement::enableEngines();
+  ESP_LOGI("Main", "Finishing");
   //Altitude alt;
   // i2c_detect();
   /*ESP_ERROR_CHECK(nvs_flash_init());
