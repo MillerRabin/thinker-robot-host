@@ -7,6 +7,7 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "driver/twai.h"
+#include "config.h"
 
 /* --------------------- Definitions and static variables ------------------ */
 //Example Configuration
@@ -112,20 +113,57 @@ static void twai_receive_task(void *arg)
             }
         } else if (action == RX_RECEIVE_DATA) {
             //Receive data messages from slave
-            uint32_t data_msgs_rec = 0;
-            while (data_msgs_rec < NO_OF_DATA_MSGS) {
-                twai_message_t rx_msg;
-                twai_receive(&rx_msg, portMAX_DELAY);
-                if (rx_msg.identifier == ID_SLAVE_DATA) {
-                    uint32_t data = 0;
-                    for (int i = 0; i < rx_msg.data_length_code; i++) {
-                        data |= (rx_msg.data[i] << (i * 8));
-                    }
-                    ESP_LOGI(EXAMPLE_TAG, "Received data value %"PRIu32, data);
-                    data_msgs_rec ++;
+            //uint32_t data_msgs_rec = 0;
+            //while (data_msgs_rec < NO_OF_DATA_MSGS) {
+            while(true) {
+              twai_message_t rx_msg;
+              if (twai_receive(&rx_msg, portMAX_DELAY) == ESP_OK) {                                
+                if (rx_msg.identifier == CAN_SHOULDER_QUATERNION) {
+                  uint16_t qx = (uint16_t)rx_msg.data[1] << 8 | rx_msg.data[0];
+                  uint16_t qy = (uint16_t)rx_msg.data[3] << 8 | rx_msg.data[2];
+                  uint16_t qz = (uint16_t)rx_msg.data[5] << 8 | rx_msg.data[4];
+                  uint16_t qw = (uint16_t)rx_msg.data[7] << 8 | rx_msg.data[6];
+                  //printf("Quaternion qx: %d, qy: %d, qz: %d, qw: %d\n", qx, qy, qz, qw);
                 }
+
+                if (rx_msg.identifier == CAN_SHOULDER_ACCELEROMETER) {
+                  uint16_t x = (uint16_t)rx_msg.data[1] << 8 | rx_msg.data[0];
+                  uint16_t y = (uint16_t)rx_msg.data[3] << 8 | rx_msg.data[2];
+                  uint16_t z = (uint16_t)rx_msg.data[5] << 8 | rx_msg.data[4];
+                  //printf("Accelerometer x: %d, y: %d, z: %d\n", x, y, z);
+                }
+
+                if (rx_msg.identifier == CAN_SHOULDER_GYROSCOPE) {
+                  uint16_t x = (uint16_t)rx_msg.data[1] << 8 | rx_msg.data[0];
+                  uint16_t y = (uint16_t)rx_msg.data[3] << 8 | rx_msg.data[2];
+                  uint16_t z = (uint16_t)rx_msg.data[5] << 8 | rx_msg.data[4];
+                  //printf("Gyroscope x: %d, y: %d, z: %d\n", x, y, z);
+                }
+
+                if (rx_msg.identifier == CAN_SHOULDER_ACCURACY) {
+                  uint8_t qa = rx_msg.data[0];
+                  uint8_t qaa = rx_msg.data[1];
+                  uint16_t qra = (uint16_t)rx_msg.data[3] << 8 | rx_msg.data[2];
+                  uint8_t qga = rx_msg.data[4];
+                  printf("Accuracy quat: %d, quatRad: %d, acc: %d, gyro: %d\n", qa, qra, qaa, qga);
+                }
+              }                                              
             }
-            xSemaphoreGive(ctrl_task_sem);
+            
+              
+
+            
+            
+                //if (rx_msg.identifier == ID_SLAVE_DATA) {
+                //uint32_t data = 0;
+                //for (int i = 0; i < rx_msg.data_length_code; i++) {
+                  //data |= (rx_msg.data[i] << (i * 8));
+                //}
+                //ESP_LOGI(EXAMPLE_TAG, "Received data value %"PRIu32, data);
+                //data_msgs_rec ++;
+                //}
+            //}
+            //xSemaphoreGive(ctrl_task_sem);
         } else if (action == RX_RECEIVE_STOP_RESP) {
             //Listen for stop response from slave
             while (1) {
@@ -153,16 +191,16 @@ static void twai_transmit_task(void *arg)
             //Repeatedly transmit pings
             ESP_LOGI(EXAMPLE_TAG, "Transmitting ping");            
             while (xSemaphoreTake(stop_ping_sem, 0) != pdTRUE) {
-                twai_transmit(&ping_message, portMAX_DELAY);
+                //twai_transmit(&ping_message, portMAX_DELAY);
                 vTaskDelay(pdMS_TO_TICKS(PING_PERIOD_MS));
             }
         } else if (action == TX_SEND_START_CMD) {
             //Transmit start command to slave
-            twai_transmit(&start_message, portMAX_DELAY);
+            //twai_transmit(&start_message, portMAX_DELAY);
             ESP_LOGI(EXAMPLE_TAG, "Transmitted start command");
         } else if (action == TX_SEND_STOP_CMD) {
             //Transmit stop command to slave
-            twai_transmit(&stop_message, portMAX_DELAY);
+            //twai_transmit(&stop_message, portMAX_DELAY);
             ESP_LOGI(EXAMPLE_TAG, "Transmitted stop command");
         } else if (action == TX_TASK_EXIT) {
             break;
@@ -176,36 +214,33 @@ static void twai_control_task(void *arg)
     xSemaphoreTake(ctrl_task_sem, portMAX_DELAY);
     tx_task_action_t tx_action;
     rx_task_action_t rx_action;
+    
+    ESP_ERROR_CHECK(twai_start());
+    ESP_LOGI(EXAMPLE_TAG, "Driver started");
 
-    for (int iter = 0; iter < NO_OF_ITERS; iter++) {
-        ESP_ERROR_CHECK(twai_start());
-        ESP_LOGI(EXAMPLE_TAG, "Driver started");
+    //tx_action = TX_SEND_PINGS;
+    //rx_action = RX_RECEIVE_DATA;
+    //xQueueSend(tx_task_queue, &tx_action, portMAX_DELAY);
+    //xQueueSend(rx_task_queue, &rx_action, portMAX_DELAY);
 
-        //Start transmitting pings, and listen for ping response
-        tx_action = TX_SEND_PINGS;
-        rx_action = RX_RECEIVE_PING_RESP;
-        xQueueSend(tx_task_queue, &tx_action, portMAX_DELAY);
-        xQueueSend(rx_task_queue, &rx_action, portMAX_DELAY);
+    //Send Start command to slave, and receive data messages
+    //xSemaphoreTake(ctrl_task_sem, portMAX_DELAY);
+    tx_action = TX_SEND_START_CMD;
+    rx_action = RX_RECEIVE_DATA;
+    xQueueSend(tx_task_queue, &tx_action, portMAX_DELAY);
+    xQueueSend(rx_task_queue, &rx_action, portMAX_DELAY);
 
-        //Send Start command to slave, and receive data messages
-        xSemaphoreTake(ctrl_task_sem, portMAX_DELAY);
-        tx_action = TX_SEND_START_CMD;
-        rx_action = RX_RECEIVE_DATA;
-        xQueueSend(tx_task_queue, &tx_action, portMAX_DELAY);
-        xQueueSend(rx_task_queue, &rx_action, portMAX_DELAY);
+    //Send Stop command to slave when enough data messages have been received. Wait for stop response
+    xSemaphoreTake(ctrl_task_sem, portMAX_DELAY);
+    tx_action = TX_SEND_STOP_CMD;
+    rx_action = RX_RECEIVE_STOP_RESP;
+    xQueueSend(tx_task_queue, &tx_action, portMAX_DELAY);
+    xQueueSend(rx_task_queue, &rx_action, portMAX_DELAY);
 
-        //Send Stop command to slave when enough data messages have been received. Wait for stop response
-        xSemaphoreTake(ctrl_task_sem, portMAX_DELAY);
-        tx_action = TX_SEND_STOP_CMD;
-        rx_action = RX_RECEIVE_STOP_RESP;
-        xQueueSend(tx_task_queue, &tx_action, portMAX_DELAY);
-        xQueueSend(rx_task_queue, &rx_action, portMAX_DELAY);
-
-        xSemaphoreTake(ctrl_task_sem, portMAX_DELAY);
-        ESP_ERROR_CHECK(twai_stop());
-        ESP_LOGI(EXAMPLE_TAG, "Driver stopped");
-        vTaskDelay(pdMS_TO_TICKS(ITER_DELAY_MS));
-    }
+    xSemaphoreTake(ctrl_task_sem, portMAX_DELAY);
+    ESP_ERROR_CHECK(twai_stop());
+    ESP_LOGI(EXAMPLE_TAG, "Driver stopped");
+        
     //Stop TX and RX tasks
     tx_action = TX_TASK_EXIT;
     rx_action = RX_TASK_EXIT;

@@ -5,8 +5,8 @@
 #include <esp_log.h>
 
 extern "C" void app_main(void)
-{    
-  //twai_initialize();
+{      
+  //system_init();
   //esp_err_t start_rest_server();
   ESP_LOGI("Main", "Init Power");
   PowerManagement::init();
@@ -22,4 +22,6 @@ extern "C" void app_main(void)
   ESP_ERROR_CHECK(esp_event_loop_create_default());
   ESP_ERROR_CHECK(wifi_connect());
   ESP_ERROR_CHECK(start_rest_server());*/
+  twai_initialize();
+  //vTaskStartScheduler();
 }
