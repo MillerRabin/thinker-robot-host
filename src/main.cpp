@@ -16,16 +16,18 @@ const char* http_username = HTTP_USERNAME;
 const char* http_password = HTTP_PASSWORD;
 
 bool enableWIFI() {
-   WiFi.mode(WIFI_STA);
-   WiFi.begin(ssid, password);   
-   if (WiFi.waitForConnectResult() != WL_CONNECTED) {      
-      Serial.printf("WiFi Failed!\n");
-      return false;
-   }
+  Serial.printf("Try to enable wifi\n");
+  WiFi.mode(WIFI_STA);
+  Serial.printf("WiFI is set\n");
+  /*WiFi.begin(ssid, password);   
+  if (WiFi.waitForConnectResult() != WL_CONNECTED) {      
+    Serial.printf("WiFi Failed!\n");
+    return false;
+  }
   Serial.println("");
   Serial.println("WiFi connected.");
   Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  Serial.println(WiFi.localIP());*/
   return true;
 }
 
@@ -35,8 +37,11 @@ void enableVersion() {
     DynamicJsonBuffer jsonBuffer;
     JsonObject &root = jsonBuffer.createObject();
     root["version"] = appVersion;
+    root["chipModel"] = ESP.getChipModel();
     root["free-heap"] = ESP.getFreeHeap();
-    
+    root["cores"] = ESP.getChipCores();
+    root["frequencyMHz"] = ESP.getCpuFreqMHz();
+    root["flashChipSize"] = ESP.getFlashChipSize();
     root.printTo(*response);
     request->send(response);
   });
@@ -44,12 +49,13 @@ void enableVersion() {
 
 void setup(){
   Serial.begin(115200);
+  Serial.println("Setup");
   if (!enableWIFI())
-      return;
+      Serial.println("Can't enable wifi");
        
-  enableVersion();
-  enableUpdate();  
-  serverBegin();
+  //enableVersion();
+  //enableUpdate();  
+  //serverBegin();
 }
 
 void loop() {
@@ -58,4 +64,6 @@ void loop() {
     delay(100);
     ESP.restart();
   }
+  Serial.println("Loop");
+  delay(1000);
 }
