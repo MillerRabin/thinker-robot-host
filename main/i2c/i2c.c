@@ -1,7 +1,7 @@
 #include "i2c.h"
 
-static gpio_num_t i2c_gpio_sda = 4;
-static gpio_num_t i2c_gpio_scl = 5;
+static gpio_num_t i2c_gpio_sda = 21;
+static gpio_num_t i2c_gpio_scl = 22;
 
 static uint32_t i2c_frequency = 100000;
 static i2c_port_t i2c_port = I2C_NUM_0;
@@ -35,7 +35,7 @@ int i2c_detect()
     {
       fflush(stdout);
       address = i + j;      
-      esp_err_t ret = i2c_master_probe(bus, address, 20);
+      esp_err_t ret = i2c_master_probe(bus, address, 100);
       if (ret == ESP_OK)
       {
         printf("%02x ", address);
