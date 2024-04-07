@@ -16,10 +16,10 @@ const char* http_username = HTTP_USERNAME;
 const char* http_password = HTTP_PASSWORD;
 
 bool enableWIFI() {
-  Serial.printf("Try to enable wifi\n");
+  //Serial.printf("Try to enable wifi\n");
   WiFi.mode(WIFI_STA);
-  Serial.printf("WiFI is set\n");
-  /*WiFi.begin(ssid, password);   
+  //Serial.printf("WiFI is set\n");
+  WiFi.begin(ssid, password);   
   if (WiFi.waitForConnectResult() != WL_CONNECTED) {      
     Serial.printf("WiFi Failed!\n");
     return false;
@@ -27,7 +27,7 @@ bool enableWIFI() {
   Serial.println("");
   Serial.println("WiFi connected.");
   Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());*/
+  Serial.println(WiFi.localIP());
   return true;
 }
 
@@ -53,9 +53,9 @@ void setup(){
   if (!enableWIFI())
       Serial.println("Can't enable wifi");
        
-  //enableVersion();
-  //enableUpdate();  
-  //serverBegin();
+  enableVersion();
+  enableUpdate();  
+  serverBegin();
 }
 
 void loop() {
@@ -63,7 +63,5 @@ void loop() {
     Serial.println("Rebooting...");
     delay(100);
     ESP.restart();
-  }
-  Serial.println("Loop");
-  delay(1000);
+  }  
 }

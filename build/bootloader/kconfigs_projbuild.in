@@ -1,0 +1,5 @@
+source "/home/millerrabin/projects/millerrabin/esp-idf/components/bootloader/Kconfig.projbuild"
+source "/home/millerrabin/projects/millerrabin/esp-idf/components/esp_app_format/Kconfig.projbuild"
+source "/home/millerrabin/projects/millerrabin/esp-idf/components/esp_rom/Kconfig.projbuild"
+source "/home/millerrabin/projects/millerrabin/esp-idf/components/esptool_py/Kconfig.projbuild"
+source "/home/millerrabin/projects/millerrabin/esp-idf/components/partition_table/Kconfig.projbuild"
