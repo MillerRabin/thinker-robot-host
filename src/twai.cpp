@@ -1,8 +1,8 @@
 #include "twai.h"
 
-CanFrame rxFrame;
-const uint rxPin = TWAI_RX_GPIO;
-const uint txPin = TWAI_TX_GPIO;
+CanFrame TWAI::rxFrame;
+const uint TWAI::rxPin = TWAI_RX_GPIO;
+const uint TWAI::txPin = TWAI_TX_GPIO;
 
 /*void sendObdFrame(uint8_t obdId) {
 	CanFrame obdFrame = { 0 };

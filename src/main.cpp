@@ -9,6 +9,8 @@
 #include "server.h"
 #include "config.h"
 #include "PowerManagement.h"
+#include "twai.h"
+#include "localBNO.h"
 
 const char* appVersion = APP_VERSION;
 const char* ssid = WIFI_SSID;
@@ -17,13 +19,10 @@ const char* http_username = HTTP_USERNAME;
 const char* http_password = HTTP_PASSWORD;
 
 void initPowerManagement() {
-  PowerManagement::init();
-  //ESP_LOGI("Main", "Enable camera");
-  //PowerManagement::enableCamera();
-  //ESP_LOGI("Main", "Enable engines");
+  PowerManagement::init();  
+  //PowerManagement::enableCamera();  
   //PowerManagement::enableEngines();
 }
-
 
 bool enableWIFI() {
   //Serial.printf("Try to enable wifi\n");
@@ -60,12 +59,16 @@ void enableVersion() {
 void setup(){
   Serial.begin(115200);
   Serial.println("Setup");
-  if (!enableWIFI())
-      Serial.println("Can't enable wifi");
-       
+  if (!enableWIFI()) {
+    Serial.println("Can't enable wifi");
+  }
+           
   enableVersion();
   enableUpdate();  
   serverBegin();
+  TWAI::begin();
+  Wire.begin(I2C_SDA, I2C_SCL, I2C_SPEED);
+  LocalBNO::begin();
 }
 
 void loop() {
@@ -73,5 +76,7 @@ void loop() {
     Serial.println("Rebooting...");
     delay(100);
     ESP.restart();
-  }  
+  }
+  //bno_getData();
+  TWAI::getData();
 }
