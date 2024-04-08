@@ -1,3 +1,4 @@
+#include "server.h"
 #include <ESPAsyncWebServer.h>
 
 AsyncWebServer Server(80);

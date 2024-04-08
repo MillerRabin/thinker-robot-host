@@ -1,6 +1,8 @@
 #include "twai.h"
 
 CanFrame rxFrame;
+const uint rxPin = TWAI_RX_GPIO;
+const uint txPin = TWAI_TX_GPIO;
 
 /*void sendObdFrame(uint8_t obdId) {
 	CanFrame obdFrame = { 0 };
@@ -19,15 +21,15 @@ CanFrame rxFrame;
     ESP32Can.writeFrame(obdFrame);  // timeout defaults to 1 ms
 }*/
 
-void TWAI_Setup() {
-    if(ESP32Can.begin(ESP32Can.convertSpeed(1000), CAN_TX, CAN_RX, 5, 5)) {
+void TWAI::begin() {
+    if(ESP32Can.begin(ESP32Can.convertSpeed(1000), txPin, rxPin, 5, 5)) {
         Serial.println("CAN bus started!");
     } else {
         Serial.println("CAN bus failed!");
     }
 }
 
-void TWAI_GetData() {
+void TWAI::getData() {
     if(ESP32Can.readFrame(rxFrame, 1000)) {
         Serial.printf("Received frame: %03X  \r\n", rxFrame.identifier);
     }

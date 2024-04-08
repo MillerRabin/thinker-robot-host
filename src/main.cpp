@@ -6,14 +6,24 @@
 //Set your wi-fi credentials in credentials.h
 #include "credentials.h"
 #include "updateHandler.h"
-#include "initServer.h"
-#include "armParams.h"
+#include "server.h"
+#include "config.h"
+#include "PowerManagement.h"
 
 const char* appVersion = APP_VERSION;
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
 const char* http_username = HTTP_USERNAME;
 const char* http_password = HTTP_PASSWORD;
+
+void initPowerManagement() {
+  PowerManagement::init();
+  //ESP_LOGI("Main", "Enable camera");
+  //PowerManagement::enableCamera();
+  //ESP_LOGI("Main", "Enable engines");
+  //PowerManagement::enableEngines();
+}
+
 
 bool enableWIFI() {
   //Serial.printf("Try to enable wifi\n");

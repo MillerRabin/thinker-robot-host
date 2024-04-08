@@ -1,6 +1,5 @@
 #include <Update.h>
 #include <ESPAsyncWebServer.h>
-#include "initServer.h"
 #include "updateHandler.h"
 
 bool shouldReboot = false;

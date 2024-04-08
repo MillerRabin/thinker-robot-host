@@ -2,6 +2,7 @@
 #include "ms5611.h"
 
 MS5611 MS5611(0x77);
+
 uint32_t start, stop;
 void ms5611_setup(TwoWire *wire)
 {
