@@ -13,11 +13,11 @@ void LocalBNO::interruptHandler() {
   xQueueSendFromISR(queueHandle, &dataReady, NULL);
 }
 
-void LocalBNO::begin() {
+void LocalBNO::begin(TwoWire& wire) {
   queueHandle = xQueueCreateStatic(1, 1, queueStorage, &xStaticQueue );  
-  Wire.flush();
+  wire.flush();
       
-  if (!bno.begin(BNO080_DEFAULT_ADDRESS, Wire, imuIntPin)) {
+  if (!bno.begin(BNO080_DEFAULT_ADDRESS, wire, imuIntPin)) {
     Serial.println(F("BNO080 not detected at default I2C address. Check your jumpers and the hookup guide. Freezing..."));    
   }
   
@@ -29,12 +29,13 @@ void LocalBNO::begin() {
   bno.getReadings();
   
   xTaskCreate(
-      loop,
-      "LocalBNOLoop",
-      4096,
-      NULL,
-      tskIDLE_PRIORITY,
-      NULL);
+    loop,
+    "LocalBNO::loop",
+    4096,
+    NULL,
+    tskIDLE_PRIORITY,
+    NULL
+  );
 }
 
 void LocalBNO::printAccuracyLevel(byte accuracyNumber) {
@@ -49,8 +50,9 @@ void LocalBNO::loop(void* parameters) {
   while (true) {
     if (xQueueReceive(queueHandle, &dataReady, pdMS_TO_TICKS(2000)) != pdTRUE) {
       Serial.printf("No data from BNO\n");    
+      continue;
     }          
-    bno.getReadings();    
+    bno.getReadings();
   }
 }
 

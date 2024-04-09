@@ -1,7 +1,9 @@
 #pragma once
 
-#include "SparkFun_BNO080_Arduino_Library.h"
+#include <SparkFun_BNO080_Arduino_Library.h>
 #include <Arduino.h>
+#include <Wire.h>
+
 #include "config.h"
 
 class LocalBNO {
@@ -13,10 +15,8 @@ class LocalBNO {
     static uint8_t queueStorage[1];
     static StaticQueue_t xStaticQueue;
     static QueueHandle_t queueHandle;
-    static bool accReady;
-    static bool quatReady;
-    void printData();
+    static void printData();
     static void loop(void* parameters);
   public:
-    static void begin();
+    static void begin(TwoWire& wire);
 };

@@ -1,9 +1,9 @@
-#include "PowerManagement.h"
+#include "powerManagement.h"
 
 const uint PowerManagement::enginePin = ENGINE_POWER_GPIO;
 const uint PowerManagement::cameraPin = CAMERA_POWER_GPIO;
 
-bool PowerManagement::init() {  
+bool PowerManagement::begin() {  
   pinMode(cameraPin, OUTPUT);
   pinMode(enginePin, OUTPUT);
   disableCamera();

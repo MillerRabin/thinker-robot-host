@@ -7,7 +7,7 @@ class PowerManagement {
     static const uint enginePin;
     static const uint cameraPin;
   public:
-    static bool init();
+    static bool begin();
     static bool enableEngines();
     static bool disableEngines();
     static bool enableCamera();

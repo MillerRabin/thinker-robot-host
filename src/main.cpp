@@ -2,15 +2,15 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include <Wire.h>
 
 //Set your wi-fi credentials in credentials.h
 #include "credentials.h"
+#include "arm.h"
 #include "updateHandler.h"
 #include "server.h"
 #include "config.h"
-#include "PowerManagement.h"
-#include "twai.h"
-#include "localBNO.h"
+
 
 const char* appVersion = APP_VERSION;
 const char* ssid = WIFI_SSID;
@@ -18,16 +18,10 @@ const char* password = WIFI_PASSWORD;
 const char* http_username = HTTP_USERNAME;
 const char* http_password = HTTP_PASSWORD;
 
-void initPowerManagement() {
-  PowerManagement::init();  
-  //PowerManagement::enableCamera();  
-  //PowerManagement::enableEngines();
-}
+Arm arm;
 
-bool enableWIFI() {
-  //Serial.printf("Try to enable wifi\n");
-  WiFi.mode(WIFI_STA);
-  //Serial.printf("WiFI is set\n");
+bool enableWIFI() {  
+  WiFi.mode(WIFI_STA);  
   WiFi.begin(ssid, password);   
   if (WiFi.waitForConnectResult() != WL_CONNECTED) {      
     Serial.printf("WiFi Failed!\n");
@@ -57,26 +51,22 @@ void enableVersion() {
 }
 
 void setup(){
-  Serial.begin(115200);
-  Serial.println("Setup");
+  Serial.begin(115200);  
   if (!enableWIFI()) {
     Serial.println("Can't enable wifi");
   }
            
   enableVersion();
   enableUpdate();  
-  serverBegin();
-  TWAI::begin();
+  serverBegin();  
   Wire.begin(I2C_SDA, I2C_SCL, I2C_SPEED);
-  LocalBNO::begin();
+  arm.begin(Wire);
 }
 
 void loop() {
    if(shouldReboot){
-    Serial.println("Rebooting...");
-    delay(100);
+    Serial.println("Rebooting...");    
     ESP.restart();
   }
-  //bno_getData();
-  TWAI::getData();
+  vTaskDelay(pdMS_TO_TICKS(2000));
 }

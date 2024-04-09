@@ -1,9 +1,21 @@
 #pragma once
 
+#include <Wire.h>
+
+#include "armPlatform.h"
 #include "armShoulder.h"
-#include "bno080.h"
+#include "twai.h"
+#include "powerManagement.h"
 
 class Arm {
-    static BNO085 imu;
-    ArmShoulder shoulder;
-}
+  private:
+    static TWAI twai;
+    static ArmPlatform platform;
+    static ArmShoulder shoulder;
+    static PowerManagement powerManagement;
+    static void getQuaternion(uint8_t data[8]);
+    static void twaiCallback(CanFrame frame);
+    
+  public:      
+    static void begin(TwoWire& wire);
+};
