@@ -12,9 +12,9 @@ class Arm {
     static TWAI twai;
     static ArmPlatform platform;
     static ArmShoulder shoulder;
-    static PowerManagement powerManagement;
-    static void getQuaternion(uint8_t data[8]);
+    static PowerManagement powerManagement;    
     static void twaiCallback(CanFrame frame);
+    static void loop(void* parameters);
     
   public:      
     static void begin(TwoWire& wire);

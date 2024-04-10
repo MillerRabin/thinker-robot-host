@@ -2,9 +2,7 @@
 
 #include "remoteBNO.h"
 
-class ArmShoulder {
-  private:
-    static RemoteBNO bno;
+class ArmShoulder {  
   public:
-    static void begin();
+    static RemoteBNO imu;    
 };

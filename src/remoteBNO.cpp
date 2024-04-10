@@ -1,5 +1,4 @@
 #include "remoteBNO.h"
 
-void RemoteBNO::begin() {
+Quaternion RemoteBNO::quaternion;
 
-}
