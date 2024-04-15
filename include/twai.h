@@ -12,8 +12,9 @@ class TWAI {
     const static uint txPin;
     static CanFrame rxFrame;
     static TWAICallback callback;
-    static void loop(void* parameters);
+    static void loop(void* parameters);    
   public:
     static void begin(TWAICallback callback);
     static void getData();
+    static bool sendData(uint32_t id, uint8_t* data);
 };

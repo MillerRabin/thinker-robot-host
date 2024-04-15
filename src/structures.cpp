@@ -7,6 +7,10 @@ Euler::Euler(const float roll, const float pitch, const float yaw) :
   yaw(yaw)
 {}
 
+const float Euler::getRollAngle() { return roll * 180.0 / PI; }
+const float Euler::getPitchAngle() { return pitch * 180.0 / PI; }
+const float Euler::getYawAngle() { return yaw * 180.0 / PI; }
+
 float StructureBasic::qToFloat(int16_t fixedPointValue, uint8_t qPoint) {
   float qFloat = fixedPointValue;
   qFloat *= pow(2, qPoint * -1);

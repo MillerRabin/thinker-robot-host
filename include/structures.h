@@ -9,6 +9,9 @@ class Euler {
     const float yaw;
     const float pitch;
     const float roll;
+    const float getRollAngle();
+    const float getPitchAngle();
+    const float getYawAngle();
 };
 
 class StructureBasic {

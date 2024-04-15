@@ -8,6 +8,7 @@
 #include "credentials.h"
 #include "arm.h"
 #include "updateHandler.h"
+#include "engineHandler.h"
 #include "server.h"
 #include "config.h"
 
@@ -58,7 +59,8 @@ void setup(){
            
   enableVersion();
   enableUpdate();  
-  serverBegin();  
+  serverBegin();
+  enableEngineHandler();
   Wire.begin(I2C_SDA, I2C_SCL, I2C_SPEED);
   arm.begin(Wire);
 }

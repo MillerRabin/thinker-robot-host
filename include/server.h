@@ -1,10 +1,7 @@
-#include <ESPAsyncWebServer.h>
+#pragma once
 
-#ifndef init_server_h
-#define init_server_h
+#include <ESPAsyncWebServer.h>
 
 extern AsyncWebServer Server;
 
 void serverBegin();
-
-#endif
