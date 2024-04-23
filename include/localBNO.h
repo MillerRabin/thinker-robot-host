@@ -18,5 +18,5 @@ class LocalBNO {
     static void printData();
     static void loop(void* parameters);
   public:
-    static void begin(TwoWire& wire);
+    static void begin(SPIClass& spi);
 };

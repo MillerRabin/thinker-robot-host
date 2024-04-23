@@ -9,23 +9,26 @@ PowerManagement Arm::powerManagement;
 
 void Arm::twaiCallback(CanFrame frame) {
   uint32_t ident = frame.identifier;  
-  if (ident == CAN_SHOULDER_QUATERNION)
+  if (ident == CAN_SHOULDER_QUATERNION) {    
     shoulder.imu.quaternion.deserialize(frame.data);  
+  }
+    
 }
 
 void Arm::loop(void* parameters) {
   while (true) {
     Euler sEuler = shoulder.imu.quaternion.getEuler();    
-    Serial.printf("roll: %f, pitch: %f, yaw: %f\n", sEuler.getRollAngle(), sEuler.getPitchAngle(), sEuler.getYawAngle());
+    //Serial.printf("roll: %f, pitch: %f, yaw: %f\n", sEuler.getRollAngle(), sEuler.getPitchAngle(), sEuler.getYawAngle());
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
 
-void Arm::begin(TwoWire& wire) {
+void Arm::begin(TwoWire& wire, SPIClass& spi) {
   powerManagement.begin();
+  //powerManagement.enableCamera();
   powerManagement.enableEngines();
   twai.begin(twaiCallback);
-  platform.begin(wire);
+  platform.begin(wire, spi);
   xTaskCreate(
     loop,
     "Arm::loop",

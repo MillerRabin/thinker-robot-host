@@ -2,11 +2,11 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
-#include <Wire.h>
+#include <SPI.h>
 
 //Set your wi-fi credentials in credentials.h
 #include "credentials.h"
-#include "arm.h"
+//#include "arm.h"
 #include "updateHandler.h"
 #include "engineHandler.h"
 #include "server.h"
@@ -60,9 +60,10 @@ void setup(){
   enableVersion();
   enableUpdate();  
   serverBegin();
-  enableEngineHandler();
+  enableEngineHandler();  
   Wire.begin(I2C_SDA, I2C_SCL, I2C_SPEED);
-  arm.begin(Wire);
+  SPI.begin(IMU_SPI_SCK, IMU_SPI_MISO_GPIO, IMU_SPI_MOSI_GPIO, IMU_SPI_CS_GPIO);
+  arm.begin(Wire, SPI);
 }
 
 void loop() {

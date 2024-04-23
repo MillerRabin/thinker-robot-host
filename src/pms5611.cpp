@@ -6,7 +6,7 @@ MS5611 PMS5611::ms(0x77);
 volatile float PMS5611::pressure;
 volatile float PMS5611::temperature;
 
-void PMS5611::begin() {
+void PMS5611::begin(TwoWire& wire) {
   if (!ms.begin()) {
     Serial.println("MS5611 is not found.");
   }
@@ -24,13 +24,15 @@ void PMS5611::begin() {
 
 void PMS5611::loop(void* parameters) {  
   while (true) {
+    ms.setOversampling(OSR_ULTRA_HIGH);
     int result = ms.read();
     if (result != MS5611_READ_OK) {
       Serial.print("Error in read: ");
       Serial.println(result);
     } else {      
       temperature = ms.getTemperature();      
-      pressure = ms.getPressure();      
+      pressure = ms.getPressure();
+      //printf("Temperature %f, pressure: %f\n", temperature, pressure);
     }
     vTaskDelay(pdMS_TO_TICKS(500));
   }

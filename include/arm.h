@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Wire.h>
+#include <SPI.h>
 
 #include "armPlatform.h"
 #include "armShoulder.h"
@@ -18,6 +19,6 @@ class Arm {
   public:
     static ArmPlatform platform;
     static ArmShoulder shoulder;
-    static void begin(TwoWire& wire);    
+    static void begin(TwoWire& wire, SPIClass& spi);
     static void set(JsonObject& data);
 };

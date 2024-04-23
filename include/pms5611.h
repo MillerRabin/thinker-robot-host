@@ -10,5 +10,5 @@ class PMS5611 {
     public:
       static volatile float pressure;
       static volatile float temperature;
-      static void begin();
+      static void begin(TwoWire& wire);
 };

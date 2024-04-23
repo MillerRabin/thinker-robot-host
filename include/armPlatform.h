@@ -10,5 +10,5 @@ class ArmPlatform {
     static LocalBNO bno;    
     static PMS5611 ms;
   public:
-    static void begin(TwoWire& wire); 
+    static void begin(TwoWire& wire, SPIClass& spi); 
 };

@@ -13,12 +13,11 @@ void LocalBNO::interruptHandler() {
   xQueueSendFromISR(queueHandle, &dataReady, NULL);
 }
 
-void LocalBNO::begin(TwoWire& wire) {
+void LocalBNO::begin(SPIClass& spi) {
   queueHandle = xQueueCreateStatic(1, 1, queueStorage, &xStaticQueue );  
-  wire.flush();
-      
-  if (!bno.begin(BNO080_DEFAULT_ADDRESS, wire, imuIntPin)) {
-    Serial.println(F("BNO080 not detected at default I2C address. Check your jumpers and the hookup guide. Freezing..."));    
+        
+  if (!bno.beginSPI(IMU_SPI_CS_GPIO, IMU_WAKE_GPIO, IMU_INT_GPIO, IMU_RST_GPIO, IMU_SPI_SPEED, spi)) {
+    Serial.println(F("BNO080 not detected at SPI"));
   }
   
   attachInterrupt(digitalPinToInterrupt(imuIntPin), interruptHandler, FALLING);
@@ -53,6 +52,7 @@ void LocalBNO::loop(void* parameters) {
       continue;
     }          
     bno.getReadings();
+    //printData();
   }
 }
 
