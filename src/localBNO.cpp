@@ -19,6 +19,7 @@ void LocalBNO::interruptHandler() {
 }
 
 void LocalBNO::begin(SPIClass& spi, DetectorsCallback callback) {
+  LocalBNO::callback = callback;
   queueHandle = xQueueCreateStatic(1, 1, queueStorage, &xStaticQueue );  
         
   if (!bno.beginSPI(IMU_SPI_CS_GPIO, IMU_WAKE_GPIO, IMU_INT_GPIO, IMU_RST_GPIO, IMU_SPI_SPEED, spi)) {
@@ -59,14 +60,16 @@ void LocalBNO::loop(void* parameters) {
       continue;
     }          
     bno.getReadings();
-    if (quaternion.set(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal))
+    if (quaternion.set(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal)) {      
       callback(CAN_PLATFORM_QUATERNION, quaternion.serialize());
-    if (accelerometer.set(bno.rawLinAccelX, bno.rawLinAccelY, bno.rawLinAccelZ))
+    }
+      
+    /*if (accelerometer.set(bno.rawLinAccelX, bno.rawLinAccelY, bno.rawLinAccelZ))
       callback(CAN_PLATFORM_ACCELEROMETER, accelerometer.serialize());
     if (gyroscope.set(bno.rawGyroX, bno.rawGyroY, bno.rawGyroZ))
       callback(CAN_PLATFORM_GYROSCOPE, gyroscope.serialize());
     if (accuracy.set(bno.rawQuatRadianAccuracy, bno.quatAccuracy, bno.gyroAccuracy, bno.accelLinAccuracy))
-      callback(CAN_PLATFORM_ACCURACY, gyroscope.serialize());
+      callback(CAN_PLATFORM_ACCURACY, gyroscope.serialize());*/   
   }
 }
 

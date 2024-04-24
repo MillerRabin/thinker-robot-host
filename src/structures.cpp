@@ -43,10 +43,10 @@ bool Quaternion::set(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, ui
   uint16_t jd = (rawQuatJ > rawJ) ? rawQuatJ - rawJ : rawJ - rawQuatJ;
   uint16_t kd = (rawQuatK > rawK) ? rawQuatK - rawK : rawK - rawQuatK;
   uint16_t rd = (rawQuatReal >rawReal) ? rawQuatReal - rawReal : rawReal - rawQuatReal;
-  rawI = rawQuatI;
-  rawJ = rawQuatJ;
-  rawK = rawQuatK;
-  rawReal = rawQuatReal;
+  this->rawI = rawQuatI;
+  this->rawJ = rawQuatJ;
+  this->rawK = rawQuatK;
+  this->rawReal = rawQuatReal;
   return ((id > 1) || (jd > 1) || (kd > 1) || (rd > 1));
 }
 

@@ -30,8 +30,10 @@ void PMS5611::loop(void* parameters) {
       Serial.print("Error in read: ");
       Serial.println(result);
     } else {
-      if (barometer.set(ms.getPressure(), ms.getTemperature()))
+      if (barometer.set(ms.getPressure(), ms.getTemperature())) {        
         callback(CAN_PLATFORM_BAROMETER, barometer.serialize());
+      }
+        
     }
     vTaskDelay(pdMS_TO_TICKS(500));
   }
