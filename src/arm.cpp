@@ -1,7 +1,6 @@
 #include "arm.h"
 #include "structures.h"
 
-
 TWAI Arm::twai;
 ArmShoulder Arm::shoulder;
 ArmPlatform Arm::platform;
@@ -11,8 +10,13 @@ void Arm::twaiCallback(CanFrame frame) {
   uint32_t ident = frame.identifier;  
   if (ident == CAN_SHOULDER_QUATERNION) {    
     shoulder.imu.quaternion.deserialize(frame.data);  
+  }    
+}
+
+void Arm::detectorsCallback(uint32_t id, uint64_t data) {
+  if (!twai.sendData(id, (uint8_t*)&data)) {
+    printf("Error sending detectors data\n");
   }
-    
 }
 
 void Arm::loop(void* parameters) {
@@ -28,7 +32,7 @@ void Arm::begin(TwoWire& wire, SPIClass& spi) {
   //powerManagement.enableCamera();
   powerManagement.enableEngines();
   twai.begin(twaiCallback);
-  platform.begin(wire, spi);
+  platform.begin(wire, spi, detectorsCallback);
   xTaskCreate(
     loop,
     "Arm::loop",
@@ -46,8 +50,6 @@ bool Arm::getFloat(JsonObject& jsonObj, const char* key, float& result) {
   result = atof(str);
   return true;
 }
-
-
 
 void Arm::set(JsonObject& data) {
   float shoulderY = NAN;

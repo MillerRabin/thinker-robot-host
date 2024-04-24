@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+typedef void (* DetectorsCallback)(uint32_t id, uint64_t data);
+
 class Euler {
   public:
     Euler(const float roll, const float pitch, const float yaw);
@@ -37,6 +39,7 @@ public:
   uint64_t serialize();  
   void deserialize(uint8_t data[8]);
   Euler getEuler();
+  bool set(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal);
 };
 
 class Accuracy {
@@ -47,6 +50,7 @@ public:
   uint8_t gyroscopeAccuracy;  
   uint64_t serialize();
   void deserialize(uint8_t data[8]);
+  bool set(uint16_t quaternionRadianAccuracy, uint8_t quaternionAccuracy, uint8_t gyroscopeAccuracy, uint8_t accelerometerAccuracy);
 };
 
 class Accelerometer {
@@ -59,6 +63,7 @@ public:
   uint8_t Q3;
   uint64_t serialize();
   void deserialize(uint8_t data[8]);
+  bool set(uint16_t rawAccX, uint16_t rawAccY, uint16_t rawAccZ);
 };
 
 class Gyroscope {
@@ -71,4 +76,14 @@ public:
   uint8_t Q3;
   uint64_t serialize();
   void deserialize(uint8_t data[8]);
+  bool set(uint16_t rawGyroX, uint16_t rawGyroY, uint16_t rawGyroZ);
+};
+
+class Barometer {
+public:
+  float pressure;
+  float temperature;
+  uint64_t serialize();
+  void deserialize(uint8_t data[8]);
+  bool set(float pressure, float temperature);
 };
