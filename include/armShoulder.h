@@ -4,5 +4,5 @@
 
 class ArmShoulder {  
   public:
-    static RemoteBNO imu;    
+    static RemoteBNO imu;
 };

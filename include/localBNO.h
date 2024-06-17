@@ -5,6 +5,7 @@
 #include <Wire.h>
 
 #include "structures.h"
+#include "quaternion.h"
 #include "config.h"
 
 class LocalBNO {
@@ -16,13 +17,13 @@ class LocalBNO {
     static uint8_t queueStorage[1];
     static StaticQueue_t xStaticQueue;
     static QueueHandle_t queueHandle;
-    static Quaternion quaternion;
-    static Accelerometer accelerometer;
-    static Gyroscope gyroscope;
-    static Accuracy accuracy;
     static void printData();
     static void loop(void* parameters);
     static DetectorsCallback callback;
   public:
     static void begin(SPIClass& spi, DetectorsCallback callback);
+    static Quaternion quaternion;
+    static Accelerometer accelerometer;
+    static Gyroscope gyroscope;
+    static Accuracy accuracy;
 };

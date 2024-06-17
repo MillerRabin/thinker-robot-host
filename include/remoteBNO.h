@@ -1,11 +1,14 @@
 #pragma once
 
 #include "structures.h"
+#include "quaternion.h"
 
 class RemoteBNO {
   private:
-    int16_t rotationVector_Q1 = 14;
-    float qToFloat(int16_t fixedPointValue, uint8_t qPoint);
+    int16_t rotationVector_Q1 = 14;    
   public:
-    static Quaternion quaternion;
+    Quaternion quaternion;
+    Accelerometer accelerometer;
+    Gyroscope gyroscope;
+    Accuracy accuracy;
 };

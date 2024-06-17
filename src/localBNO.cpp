@@ -32,6 +32,7 @@ void LocalBNO::begin(SPIClass& spi, DetectorsCallback callback) {
   bno.enableRotationVector(50);
   bno.enableLinearAccelerometer(50);
   bno.enableGyro(50);
+  bno.clearTare();
   bno.calibrateAll();  
   bno.getReadings();
   
@@ -60,16 +61,14 @@ void LocalBNO::loop(void* parameters) {
       continue;
     }          
     bno.getReadings();
-    if (quaternion.set(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal)) {      
+    if (quaternion.set(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal))
       callback(CAN_PLATFORM_QUATERNION, quaternion.serialize());
-    }
-      
-    /*if (accelerometer.set(bno.rawLinAccelX, bno.rawLinAccelY, bno.rawLinAccelZ))
+    if (accelerometer.set(bno.rawLinAccelX, bno.rawLinAccelY, bno.rawLinAccelZ))
       callback(CAN_PLATFORM_ACCELEROMETER, accelerometer.serialize());
     if (gyroscope.set(bno.rawGyroX, bno.rawGyroY, bno.rawGyroZ))
       callback(CAN_PLATFORM_GYROSCOPE, gyroscope.serialize());
     if (accuracy.set(bno.rawQuatRadianAccuracy, bno.quatAccuracy, bno.gyroAccuracy, bno.accelLinAccuracy))
-      callback(CAN_PLATFORM_ACCURACY, gyroscope.serialize());*/   
+      callback(CAN_PLATFORM_ACCURACY, gyroscope.serialize());
   }
 }
 

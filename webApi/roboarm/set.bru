@@ -1,0 +1,18 @@
+meta {
+  name: set
+  type: http
+  seq: 3
+}
+
+post {
+  url: http://192.168.1.70/set
+  body: json
+  auth: none
+}
+
+body:json {
+  {    
+      "shoulder-y": 20,
+      "shoulder-z": 135
+  }
+}
