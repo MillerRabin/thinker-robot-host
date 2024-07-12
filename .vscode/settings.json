@@ -13,6 +13,8 @@
         "deque": "cpp",
         "unordered_map": "cpp",
         "vector": "cpp",
-        "regex": "cpp"
+        "regex": "cpp",
+        "bitset": "cpp",
+        "utility": "cpp"
     }
 }

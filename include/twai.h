@@ -24,7 +24,8 @@ class TWAI {
     static void sendTask(void* parameters);
     static void receiveTask(void* parameters);
   public:
-    static SemaphoreHandle_t semaphore;
+    static SemaphoreHandle_t receiveSemaphore;
+    static SemaphoreHandle_t sendSemaphore;
     static void begin(TWAICallback callback);    
     static bool sendData(uint32_t id, uint8_t* data);
 };
