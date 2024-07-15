@@ -2,26 +2,24 @@
 
 uint LocalBNO::imuIntPin = IMU_INT_GPIO;
 BNO080 LocalBNO::bno;
-
-uint8_t LocalBNO::queueStorage[1];
-StaticQueue_t LocalBNO::xStaticQueue;
-QueueHandle_t LocalBNO::queueHandle;
 DetectorsCallback LocalBNO::callback;
 Quaternion LocalBNO::quaternion;
 Accelerometer LocalBNO::accelerometer;
 Gyroscope LocalBNO::gyroscope;
 Accuracy LocalBNO::accuracy;
+TaskHandle_t LocalBNO::taskHandle;
+const uint32_t LocalBNO::notificationIndex = 0;
 
 void LocalBNO::interruptHandler() {
-  byte dataReady = 1;
-  if (!queueHandle) return;
-  xQueueSendFromISR(queueHandle, &dataReady, NULL);
+  if (LocalBNO::taskHandle == NULL) return;
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;  
+  vTaskNotifyGiveIndexedFromISR(LocalBNO::taskHandle, LocalBNO::notificationIndex, &xHigherPriorityTaskWoken);
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 void LocalBNO::begin(SPIClass& spi, DetectorsCallback callback) {
   LocalBNO::callback = callback;
-  queueHandle = xQueueCreateStatic(1, 1, queueStorage, &xStaticQueue );  
-        
+          
   if (!bno.beginSPI(IMU_SPI_CS_GPIO, IMU_WAKE_GPIO, IMU_INT_GPIO, IMU_RST_GPIO, IMU_SPI_SPEED, spi)) {
     Serial.println(F("BNO080 not detected at SPI"));
   }
@@ -42,7 +40,7 @@ void LocalBNO::begin(SPIClass& spi, DetectorsCallback callback) {
     4096,
     NULL,
     tskIDLE_PRIORITY,
-    NULL
+    &LocalBNO::taskHandle
   );
 }
 
@@ -54,13 +52,14 @@ void LocalBNO::printAccuracyLevel(byte accuracyNumber) {
 }
 
 void LocalBNO::loop(void* parameters) {
-  byte dataReady = false;
+  uint32_t notificationValue;    
   while (true) {
-    if (xQueueReceive(queueHandle, &dataReady, pdMS_TO_TICKS(2000)) != pdTRUE) {
-      Serial.printf("No data from BNO\n");    
-      continue;
-    }          
-    bno.getReadings();
+    bno.getReadings();    
+    notificationValue = ulTaskNotifyTakeIndexed(LocalBNO::notificationIndex, pdTRUE, pdMS_TO_TICKS(50));      
+    if(notificationValue == 0) {
+      printf("LocalBNO notificationResult error %d\n", notificationValue);
+      continue;                
+    }
     if (quaternion.set(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal))
       callback(CAN_PLATFORM_QUATERNION, quaternion.serialize());
     if (accelerometer.set(bno.rawLinAccelX, bno.rawLinAccelY, bno.rawLinAccelZ))

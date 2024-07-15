@@ -20,9 +20,9 @@ void Arm::twaiCallback(CanFrame frame) {
 }
 
 void Arm::detectorsCallback(uint32_t id, uint64_t data) {
-  /*if (!twai.sendData(id, (uint8_t*)&data)) {
+  if (!twai.sendData(id, (uint8_t*)&data)) {
     printf("Error sending detectors data\n");
-  }*/
+  }
 }
 
 void Arm::loop(void* parameters) {

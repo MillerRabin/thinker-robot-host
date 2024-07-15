@@ -31,7 +31,12 @@ bool TWAI::sendData(uint32_t id, uint8_t* data) {
   obdFrame.data_length_code = 8;
   obdFrame.extd = 0;
   memcpy(obdFrame.data, data, 8);
+  if (xSemaphoreTake(TWAI::sendSemaphore, pdMS_TO_TICKS(500)) != pdTRUE) {
+    Serial.printf("Can't obtain receiveSemaphore in sendData\n"); 
+    return false;
+  };  
   canSendMap[id] = obdFrame;
+  xSemaphoreGive(TWAI::sendSemaphore);
   return true;  
 }
 
@@ -46,8 +51,8 @@ void TWAI::begin(TWAICallback callback) {
     Serial.println("CAN bus failed!");
   }
   xTaskCreate(loopTask, "TWAI::loop", 4096, NULL, 5, NULL);
-  xTaskCreate(receiveTask, "TWAI::receive", 1024, NULL, 5, NULL);
-  xTaskCreate(sendTask, "TWAI::send", 1024, NULL, 5, NULL);
+  xTaskCreate(receiveTask, "TWAI::receive", 4096, NULL, 5, NULL);
+  xTaskCreate(sendTask, "TWAI::send", 4096, NULL, 5, NULL);
 }
 
 bool TWAI::read() {  
@@ -75,18 +80,17 @@ void TWAI::sendTask(void* parameters) {
         continue;
       };
     for(auto item: canSendMap) {
-      CanFrame frame = item.second;
+      CanFrame frame = item.second;      
       bool res = ESP32Can.writeFrame(frame);
     }
-    canSendMap.clear();
+    //canSendMap.clear();
     xSemaphoreGive(TWAI::sendSemaphore);
     vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
 void TWAI::loopTask(void* parameters) {  
-  Serial.printf("Loop task started\n");    
-  uint8_t dataReady = 0;
+  Serial.printf("Loop task started\n");      
   while (true) {            
     if (xSemaphoreTake(TWAI::receiveSemaphore, pdMS_TO_TICKS(500)) != pdTRUE) {
         Serial.printf("Can't obtain receiveSemaphore in loopTask\n"); 
@@ -96,7 +100,7 @@ void TWAI::loopTask(void* parameters) {
       CanFrame frame = item.second;      
       callback(frame);
     }
-    canReceiveMap.clear();
+    //canReceiveMap.clear();
     xSemaphoreGive(TWAI::receiveSemaphore);
     vTaskDelay(pdMS_TO_TICKS(50));
   }

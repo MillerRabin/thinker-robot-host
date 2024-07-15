@@ -14,9 +14,8 @@ class LocalBNO {
     static uint imuIntPin;
     static void interruptHandler();
     void printAccuracyLevel(byte accuracyNumber);    
-    static uint8_t queueStorage[1];
-    static StaticQueue_t xStaticQueue;
-    static QueueHandle_t queueHandle;
+    static TaskHandle_t taskHandle;
+    static const uint32_t notificationIndex;
     static void printData();
     static void loop(void* parameters);
     static DetectorsCallback callback;
