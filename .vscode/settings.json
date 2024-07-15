@@ -4,5 +4,17 @@
         "board/esp32-bridge.cfg"
     ],
     "idf.flashType": "UART",
-    "idf.port": "/dev/ttyUSB0"
+    "idf.port": "/dev/ttyUSB0",
+    "files.associations": {
+        "array": "cpp",
+        "string": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "c",
+        "deque": "cpp",
+        "unordered_map": "cpp",
+        "vector": "cpp",
+        "regex": "cpp",
+        "bitset": "cpp",
+        "utility": "cpp"
+    }
 }
