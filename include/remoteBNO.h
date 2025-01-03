@@ -5,8 +5,9 @@
 
 class RemoteBNO {
   private:
-    int16_t rotationVector_Q1 = 14;    
+    int16_t rotationVector_Q1 = 14;  
   public:
+    Quaternion getQuaternion();
     Quaternion quaternion;
     Accelerometer accelerometer;
     Gyroscope gyroscope;

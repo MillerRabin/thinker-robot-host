@@ -4,14 +4,10 @@ void sendSuccess(AsyncWebServerRequest *request) {
   AsyncResponseStream *response = request->beginResponseStream("application/json");
   DynamicJsonBuffer jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
- 
+   
   JsonObject& platform = root.createNestedObject("platform");
-  Quaternion pquat = Arm::platform.imu.quaternion;
-  Euler pe = pquat.getEuler();
+  Quaternion pquat = Arm::platform.imu.getQuaternion();
   Accuracy pa = Arm::platform.imu.accuracy;
-  platform["roll"] = pe.getRollAngle();
-  platform["pitch"] = pe.getPitchAngle();
-  platform["yaw"] = pe.getYawAngle();
   platform["i"] = pquat.i;
   platform["j"] = pquat.j;
   platform["k"] = pquat.k;
@@ -22,12 +18,8 @@ void sendSuccess(AsyncWebServerRequest *request) {
   platform["gyroscopeAccuracy"] = pa.gyroscopeAccuracy;
 
   JsonObject& shoulder = root.createNestedObject("shoulder");    
-  Quaternion squat = Arm::shoulder.imu.quaternion;  
-  Euler se = squat.getEuler();  
-  Accuracy sa = Arm::shoulder.imu.accuracy;
-  shoulder["roll"] = se.getRollAngle();
-  shoulder["pitch"] = se.getPitchAngle();
-  shoulder["yaw"] = se.getYawAngle();
+  Quaternion squat = Arm::shoulder.imu.getQuaternion();
+  Accuracy sa = Arm::shoulder.imu.accuracy;  
   shoulder["i"] = squat.i;
   shoulder["j"] = squat.j;
   shoulder["k"] = squat.k;
@@ -36,11 +28,35 @@ void sendSuccess(AsyncWebServerRequest *request) {
   shoulder["quaternionRadianAccuracy"] = sa.quaternionRadAccuracy;
   shoulder["accelerometerAccuracy"] = sa.accelerometerAccuracy;
   shoulder["gyroscopeAccuracy"] = sa.gyroscopeAccuracy;
+
+  JsonObject& elbow = root.createNestedObject("elbow");
+  Quaternion equat = Arm::elbow.imu.getQuaternion();
+  Accuracy ea = Arm::elbow.imu.accuracy;  
+  elbow["i"] = equat.i;
+  elbow["j"] = equat.j;
+  elbow["k"] = equat.k;
+  elbow["real"] = equat.real;
+  elbow["quaternionAccuracy"] = ea.quaternionAccuracy;
+  elbow["quaternionRadianAccuracy"] = ea.quaternionRadAccuracy;
+  elbow["accelerometerAccuracy"] = ea.accelerometerAccuracy;
+  elbow["gyroscopeAccuracy"] = ea.gyroscopeAccuracy;
+
+  JsonObject& wrist = root.createNestedObject("wrist");
+  Quaternion wquat = Arm::wrist.imu.getQuaternion();
+  Accuracy wa = Arm::wrist.imu.accuracy;  
+  wrist["i"] = wquat.i;
+  wrist["j"] = wquat.j;
+  wrist["k"] = wquat.k;
+  wrist["real"] = wquat.real;
+  wrist["quaternionAccuracy"] = wa.quaternionAccuracy;
+  wrist["quaternionRadianAccuracy"] = wa.quaternionRadAccuracy;
+  wrist["accelerometerAccuracy"] = wa.accelerometerAccuracy;
+  wrist["gyroscopeAccuracy"] = wa.gyroscopeAccuracy;
   root.printTo(*response);
   request->send(response);
 }
 
-void enableEngineHandler() {
+void enableEngineHandler() {  
   Server.on("/set", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
     request->send(200);
   });
@@ -61,11 +77,11 @@ void enableEngineHandler() {
     sendSuccess(request);
   });
   
-  Server.on("/status", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
+  Server.on("/status", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {  
     request->send(200);
   });
   
-  AsyncCallbackJsonWebHandler* statusHandler = new AsyncCallbackJsonWebHandler("/status", [](AsyncWebServerRequest *request, JsonVariant &json) mutable {        
+  AsyncCallbackJsonWebHandler* statusHandler = new AsyncCallbackJsonWebHandler("/status", [](AsyncWebServerRequest *request, JsonVariant &json) mutable {            
     sendSuccess(request);
   });
   

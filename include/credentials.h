@@ -3,7 +3,7 @@
 //Define your credentials here
 
 //Your wi-fi credentials
-#define WIFI_SSID "DragonSlayer1"
+#define WIFI_SSID "DragonSlayer"
 #define WIFI_PASSWORD "ifyouwanttohave"
 
 //Login and password for http update

@@ -83,3 +83,8 @@ void LocalBNO::printData() {
   Serial.print(yaw, 1);
   Serial.println("");
 }
+
+Quaternion LocalBNO::getQuaternion() {
+  quaternion.convertRawData();
+  return quaternion;
+}

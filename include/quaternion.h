@@ -5,8 +5,7 @@
 #include "euler.h"
 
 class Quaternion : public StructureBase {
-private:
-  void convertRawData();
+private:  
   void applyRotate();
 public:
   uint16_t rawI;
@@ -29,4 +28,5 @@ public:
   Euler getEuler();
   bool set(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal);
   void setRotate(float i, float j, float k, float real);
+  void convertRawData();
 };

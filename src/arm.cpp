@@ -3,20 +3,63 @@
 
 TWAI Arm::twai;
 ArmShoulder Arm::shoulder;
+ArmElbow Arm::elbow;
+ArmWrist Arm::wrist;
 ArmPlatform Arm::platform;
 
 PowerManagement Arm::powerManagement;
 
 void Arm::twaiCallback(CanFrame frame) {
   uint32_t ident = frame.identifier;  
-  if (ident == CAN_SHOULDER_QUATERNION)
-    shoulder.imu.quaternion.deserialize(frame.data);  
-  if (ident == CAN_SHOULDER_ACCELEROMETER)
-    shoulder.imu.accelerometer.deserialize(frame.data);  
-  if (ident == CAN_SHOULDER_GYROSCOPE)
-    shoulder.imu.gyroscope.deserialize(frame.data);  
-  if (ident == CAN_SHOULDER_ACCURACY)
-    shoulder.imu.accuracy.deserialize(frame.data);  
+  if (ident == CAN_SHOULDER_QUATERNION) {
+    shoulder.imu.quaternion.deserialize(frame.data);
+    return;
+  }    
+  if (ident == CAN_SHOULDER_ACCELEROMETER) {
+    shoulder.imu.accelerometer.deserialize(frame.data);
+    return;
+  }    
+  if (ident == CAN_SHOULDER_GYROSCOPE) {
+    shoulder.imu.gyroscope.deserialize(frame.data);
+    return;
+  }    
+  if (ident == CAN_SHOULDER_ACCURACY) {
+    shoulder.imu.accuracy.deserialize(frame.data);
+    return;
+  }    
+  if (ident == CAN_ELBOW_QUATERNION) { 
+    elbow.imu.quaternion.deserialize(frame.data);
+    return;
+  }
+  if (ident == CAN_ELBOW_ACCELEROMETER) {
+    elbow.imu.accelerometer.deserialize(frame.data);  
+    return;
+  }    
+  if (ident == CAN_ELBOW_GYROSCOPE) {
+    elbow.imu.gyroscope.deserialize(frame.data);  
+    return;
+  }    
+  if (ident == CAN_ELBOW_ACCURACY) {
+    elbow.imu.accuracy.deserialize(frame.data);  
+    return;
+  }
+  if (ident == CAN_WRIST_QUATERNION) { 
+    wrist.imu.quaternion.deserialize(frame.data);
+    return;
+  }
+  if (ident == CAN_WRIST_ACCELEROMETER) {
+    wrist.imu.accelerometer.deserialize(frame.data);  
+    return;
+  }    
+  if (ident == CAN_WRIST_GYROSCOPE) {
+    wrist.imu.gyroscope.deserialize(frame.data);  
+    return;
+  }    
+  if (ident == CAN_WRIST_ACCURACY) {
+    wrist.imu.accuracy.deserialize(frame.data);  
+    return;
+  }    
+  
 }
 
 void Arm::detectorsCallback(uint32_t id, uint64_t data) {

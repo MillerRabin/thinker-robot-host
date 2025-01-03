@@ -22,6 +22,7 @@ class LocalBNO {
   public:
     static void begin(SPIClass& spi, DetectorsCallback callback);
     static Quaternion quaternion;
+    Quaternion getQuaternion();
     static Accelerometer accelerometer;
     static Gyroscope gyroscope;
     static Accuracy accuracy;

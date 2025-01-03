@@ -5,6 +5,8 @@
 
 #include "armPlatform.h"
 #include "armShoulder.h"
+#include "armElbow.h"
+#include "armWrist.h"
 #include "twai.h"
 #include "powerManagement.h"
 #include "AsyncJson.h"
@@ -20,6 +22,8 @@ class Arm {
   public:    
     static ArmPlatform platform;
     static ArmShoulder shoulder;
+    static ArmElbow elbow;
+    static ArmWrist wrist;
     static void begin(TwoWire& wire, SPIClass& spi);
     static void set(JsonObject& data);
     static void setRotate(JsonObject& data);
