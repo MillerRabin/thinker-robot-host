@@ -10,6 +10,7 @@
 #include "twai.h"
 #include "powerManagement.h"
 #include "AsyncJson.h"
+#include "responseStatus.h"
 
 class Arm {
   private:
@@ -27,4 +28,5 @@ class Arm {
     static void begin(TwoWire& wire, SPIClass& spi);
     static void set(JsonObject& data);
     static void setRotate(JsonObject& data);
+    static StatusResponse upgrade(JsonObject& data);
 };

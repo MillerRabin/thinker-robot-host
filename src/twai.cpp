@@ -32,7 +32,7 @@ void TWAI::begin(TWAICallback callback) {
   TWAI::callback = callback;  
   TWAI::receiveSemaphore = xSemaphoreCreateMutex();
   TWAI::sendSemaphore = xSemaphoreCreateMutex();  
-  if (ESP32Can.begin(ESP32Can.convertSpeed(1000), txPin, rxPin, 5, 5)) {
+  if (ESP32Can.begin(ESP32Can.convertSpeed(1000), txPin, rxPin, 10, 10)) {
     Serial.println("CAN bus started!");
   }
   else {
@@ -62,6 +62,7 @@ void TWAI::receiveTask(void* parameters) {
 }
 
 void TWAI::sendTask(void* parameters) {  
+  printf("TWAI::Send task started\n");
   while (true) {
     if (xSemaphoreTake(TWAI::sendSemaphore, pdMS_TO_TICKS(500)) != pdTRUE) {
         Serial.printf("Can't obtain receiveSemaphore in sendTask\n"); 
@@ -70,10 +71,15 @@ void TWAI::sendTask(void* parameters) {
     for(auto item: canSendMap) {
       CanFrame frame = item.second;      
       bool res = ESP32Can.writeFrame(frame);
+      if (!res) {
+        printf("Send frame error 0x%x\n", frame.identifier);
+      } else {
+        printf("Send frame success 0x%x\n", frame.identifier);
+      }
     }
-    //canSendMap.clear();
+    canSendMap.clear();
     xSemaphoreGive(TWAI::sendSemaphore);
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(5000));
   }
 }
 

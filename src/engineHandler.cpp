@@ -56,6 +56,17 @@ void sendSuccess(AsyncWebServerRequest *request) {
   request->send(response);
 }
 
+void sendStatus(AsyncWebServerRequest *request, StatusResponse response) {
+  AsyncResponseStream *resp = request->beginResponseStream("application/json");
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject& root = jsonBuffer.createObject();
+   
+  root["message"] = response.message.c_str();
+  root["code"] = response.code;
+  root.printTo(*resp);
+  request->send(resp);
+}
+
 void enableEngineHandler() {  
   Server.on("/set", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
     request->send(200);
@@ -81,12 +92,23 @@ void enableEngineHandler() {
     request->send(200);
   });
   
-  AsyncCallbackJsonWebHandler* statusHandler = new AsyncCallbackJsonWebHandler("/status", [](AsyncWebServerRequest *request, JsonVariant &json) mutable {            
+  AsyncCallbackJsonWebHandler* statusHandler = new AsyncCallbackJsonWebHandler("/status", [](AsyncWebServerRequest *request, JsonVariant &json) mutable {
     sendSuccess(request);
   });
+
+  Server.on("/upgrade", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {  
+    request->send(200);
+  });
   
+
+  AsyncCallbackJsonWebHandler* upgradeHandler = new AsyncCallbackJsonWebHandler("/upgrade", [](AsyncWebServerRequest *request, JsonVariant &json) mutable {    
+    JsonObject& jsonObj = json.as<JsonObject>();
+    auto status = Arm::upgrade(jsonObj);
+    sendStatus(request, status);
+  });
   
   Server.addHandler(engineHandler); 
   Server.addHandler(rotationHandler); 
   Server.addHandler(statusHandler); 
+  Server.addHandler(upgradeHandler); 
 }

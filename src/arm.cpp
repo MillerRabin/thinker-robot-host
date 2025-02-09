@@ -10,7 +10,7 @@ ArmPlatform Arm::platform;
 PowerManagement Arm::powerManagement;
 
 void Arm::twaiCallback(CanFrame frame) {
-  uint32_t ident = frame.identifier;  
+  uint32_t ident = frame.identifier;    
   if (ident == CAN_SHOULDER_QUATERNION) {
     shoulder.imu.quaternion.deserialize(frame.data);
     return;
@@ -86,7 +86,7 @@ void Arm::begin(TwoWire& wire, SPIClass& spi) {
   powerManagement.begin();    
   //shoulder.imu.quaternion.setRotate(0.0F, 0.7071F, 0.0F, 0.7071F);
   //powerManagement.enableCamera();
-  powerManagement.enableEngines();
+  powerManagement.enableEngines();  
   twai.begin(twaiCallback);
   platform.begin(wire, spi, detectorsCallback);
   /*xTaskCreate(
@@ -137,4 +137,24 @@ void Arm::setRotate(JsonObject& data) {
   if (!twai.sendData(CAN_SHOULDER_SET_ROTATE_RADIAN, sData)) {
     printf("Error sending rotate data\n");
   }*/
+}
+
+StatusResponse Arm::upgrade(JsonObject& data) {      
+  uint8_t sData[8] = { 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA };
+  if (!data.containsKey("part")) {
+   return StatusResponse({ "No key of part found", RESPONSE_STATUS_NO_ARM_PART_KEY_FOUND });
+  }    
+  const char *b = data["part"];
+  std::string str = std::string(b);  
+  if (str == "shoulder") {
+    if (!twai.sendData(CAN_SHOULDER_FIRMWARE_UPGRADE, sData)) {      
+      return StatusResponse({ "Shoulder TWAI upgrade command error", RESPONSE_STATUS_TWAI_SEND_DATA_ERROR });
+    }
+  }
+  if (str == "claw") {      
+    if (!twai.sendData(CAN_CLAW_FIRMWARE_UPGRADE, sData)) {      
+      return StatusResponse({ "Claw TWAI upgrade command error", RESPONSE_STATUS_TWAI_SEND_DATA_ERROR });
+    }
+  }    
+  return StatusResponse({ "Upgrade success", RESPONSE_STATUS_SUCCESS });;
 }

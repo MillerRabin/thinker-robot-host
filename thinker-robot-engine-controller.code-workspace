@@ -1,0 +1,30 @@
+{
+	"folders": [
+		{
+			"path": "../thinker-robot-engine-controller"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.tcc": "cpp",
+			"vector": "cpp",
+			"algorithm": "cpp",
+			"clocks.h": "c",
+			"array": "cpp",
+			"string": "cpp",
+			"string_view": "cpp",
+			"iostream": "cpp",
+			"memory": "cpp",
+			"istream": "cpp",
+			"functional": "cpp",
+			"tuple": "cpp",
+			"utility": "cpp",
+			"cstdint": "cpp",
+			"cstddef": "cpp",
+			"cmath": "cpp"
+		}
+	}
+}
