@@ -6,12 +6,14 @@ ArmShoulder Arm::shoulder;
 ArmElbow Arm::elbow;
 ArmWrist Arm::wrist;
 ArmPlatform Arm::platform;
+ArmStatus Arm::status;
 
 PowerManagement Arm::powerManagement;
 
 void Arm::twaiCallback(CanFrame frame) {
   uint32_t ident = frame.identifier;    
   if (ident == CAN_SHOULDER_QUATERNION) {
+    Arm::status.shoulderQuaternionOK = true;
     shoulder.imu.quaternion.deserialize(frame.data);
     return;
   }    
@@ -27,7 +29,8 @@ void Arm::twaiCallback(CanFrame frame) {
     shoulder.imu.accuracy.deserialize(frame.data);
     return;
   }    
-  if (ident == CAN_ELBOW_QUATERNION) { 
+  if (ident == CAN_ELBOW_QUATERNION) {
+    Arm::status.elbowQuaternionOK = true;
     elbow.imu.quaternion.deserialize(frame.data);
     return;
   }
@@ -58,7 +61,16 @@ void Arm::twaiCallback(CanFrame frame) {
   if (ident == CAN_WRIST_ACCURACY) {
     wrist.imu.accuracy.deserialize(frame.data);  
     return;
-  }    
+  }     
+}
+
+void Arm::twaiErrorCallback(CanFrame frame, int code) {  
+  if (code == CAN_SUCCESS) {
+    Arm::status.canSendOK = true;
+  } else {
+    Arm::status.canSendOK = false;    
+    printf("frame send error %d\n", frame.identifier);
+  }
   
 }
 
@@ -78,6 +90,8 @@ void Arm::loop(void* parameters) {
     Euler pEuler = platform.imu.quaternion.getEuler();
     uint8_t pAcc = platform.imu.accuracy.quaternionAccuracy;  
     printf("PlatformBNO roll: %f, pitch: %f, yaw: %f, accuracy: %d\n", pEuler.getRollAngle(), pEuler.getPitchAngle(), pEuler.getYawAngle(), pAcc);
+    Arm::status.shoulderQuaternionOK = false;
+    Arm::status.elbowQuaternionOK = false;
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
@@ -87,16 +101,16 @@ void Arm::begin(TwoWire& wire, SPIClass& spi) {
   //shoulder.imu.quaternion.setRotate(0.0F, 0.7071F, 0.0F, 0.7071F);
   //powerManagement.enableCamera();
   powerManagement.enableEngines();  
-  twai.begin(twaiCallback);
-  platform.begin(wire, spi, detectorsCallback);
-  /*xTaskCreate(
+  twai.begin(twaiCallback, twaiErrorCallback);
+  platform.begin(wire, spi, detectorsCallback); 
+  xTaskCreate(
     loop,
     "Arm::loop",
     4096,
     NULL,
-    tskIDLE_PRIORITY,
+    5,
     NULL
-  );*/
+  );
 }
 
 bool Arm::getFloat(JsonObject& jsonObj, const char* key, float& result) {
@@ -149,6 +163,16 @@ StatusResponse Arm::upgrade(JsonObject& data) {
   if (str == "shoulder") {
     if (!twai.sendData(CAN_SHOULDER_FIRMWARE_UPGRADE, sData)) {      
       return StatusResponse({ "Shoulder TWAI upgrade command error", RESPONSE_STATUS_TWAI_SEND_DATA_ERROR });
+    }
+  }
+  if (str == "elbow") {
+    if (!twai.sendData(CAN_ELBOW_FIRMWARE_UPGRADE, sData)) {      
+      return StatusResponse({ "elbow TWAI upgrade command error", RESPONSE_STATUS_TWAI_SEND_DATA_ERROR });
+    }
+  }
+  if (str == "wrist") {
+    if (!twai.sendData(CAN_WRIST_FIRMWARE_UPGRADE, sData)) {      
+      return StatusResponse({ "Wrist TWAI upgrade command error", RESPONSE_STATUS_TWAI_SEND_DATA_ERROR });
     }
   }
   if (str == "claw") {      

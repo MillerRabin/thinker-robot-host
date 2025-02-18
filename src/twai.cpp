@@ -3,6 +3,7 @@
 const uint TWAI::rxPin = TWAI_RX_GPIO;
 const uint TWAI::txPin = TWAI_TX_GPIO;
 TWAICallback TWAI::callback;
+TWAIErrorCallback TWAI::errorCallback;
 SemaphoreHandle_t TWAI::receiveSemaphore;
 SemaphoreHandle_t TWAI::sendSemaphore;
 CanFrame TWAI::rxFrame = { 0 };
@@ -28,8 +29,9 @@ bool TWAI::sendData(uint32_t id, uint8_t* data) {
   return true;  
 }
 
-void TWAI::begin(TWAICallback callback) {
-  TWAI::callback = callback;  
+void TWAI::begin(TWAICallback callback, TWAIErrorCallback errorCallback) {
+  TWAI::callback = callback;
+  TWAI::errorCallback = errorCallback;  
   TWAI::receiveSemaphore = xSemaphoreCreateMutex();
   TWAI::sendSemaphore = xSemaphoreCreateMutex();  
   if (ESP32Can.begin(ESP32Can.convertSpeed(1000), txPin, rxPin, 10, 10)) {
@@ -72,9 +74,9 @@ void TWAI::sendTask(void* parameters) {
       CanFrame frame = item.second;      
       bool res = ESP32Can.writeFrame(frame);
       if (!res) {
-        printf("Send frame error 0x%x\n", frame.identifier);
+        errorCallback(frame, CAN_SEND_ERROR);
       } else {
-        printf("Send frame success 0x%x\n", frame.identifier);
+        errorCallback(frame, CAN_SUCCESS);
       }
     }
     canSendMap.clear();

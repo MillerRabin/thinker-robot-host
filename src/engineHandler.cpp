@@ -52,6 +52,12 @@ void sendSuccess(AsyncWebServerRequest *request) {
   wrist["quaternionRadianAccuracy"] = wa.quaternionRadAccuracy;
   wrist["accelerometerAccuracy"] = wa.accelerometerAccuracy;
   wrist["gyroscopeAccuracy"] = wa.gyroscopeAccuracy;
+  
+  JsonObject& st = root.createNestedObject("status");
+  
+  st["canSendOK"] = Arm::status.canSendOK;
+  st["shoulderOK"] = Arm::status.shoulderQuaternionOK;
+  st["elbowOK"] = Arm::status.elbowQuaternionOK;
   root.printTo(*response);
   request->send(response);
 }

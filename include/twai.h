@@ -6,6 +6,7 @@
 #include <map>
 
 typedef void (* TWAICallback)( CanFrame frame );
+typedef void (* TWAIErrorCallback)( CanFrame frame, int code );
 typedef std::map<uint32_t, CanFrame> CanMap;
 
 class TWAI {
@@ -14,6 +15,7 @@ class TWAI {
     const static uint txPin;
     static CanFrame rxFrame;
     static TWAICallback callback;
+    static TWAIErrorCallback errorCallback;
     static void loop(void* parameters);
     static bool read();    
     static StaticQueue_t notifyQueue;
@@ -26,6 +28,6 @@ class TWAI {
   public:
     static SemaphoreHandle_t receiveSemaphore;
     static SemaphoreHandle_t sendSemaphore;
-    static void begin(TWAICallback callback);    
+    static void begin(TWAICallback callback, TWAIErrorCallback errorCallback);    
     static bool sendData(uint32_t id, uint8_t* data);
 };

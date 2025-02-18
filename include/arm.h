@@ -12,15 +12,24 @@
 #include "AsyncJson.h"
 #include "responseStatus.h"
 
+class ArmStatus {
+  public: 
+    bool canSendOK;
+    bool shoulderQuaternionOK;
+    bool elbowQuaternionOK;
+};
+
 class Arm {
   private:
     static TWAI twai;    
     static PowerManagement powerManagement;    
     static void twaiCallback(CanFrame frame);
+    static void twaiErrorCallback(CanFrame frame, int code);
     static void detectorsCallback(uint32_t id, uint64_t data);
     static void loop(void* parameters);
     static bool getFloat(JsonObject& jsonObj, const char* key, float& result);
-  public:    
+  public:
+    static ArmStatus status;
     static ArmPlatform platform;
     static ArmShoulder shoulder;
     static ArmElbow elbow;
