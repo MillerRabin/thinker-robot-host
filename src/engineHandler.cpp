@@ -58,6 +58,9 @@ void sendSuccess(AsyncWebServerRequest *request) {
   st["canSendOK"] = Arm::status.canSendOK;
   st["shoulderOK"] = Arm::status.shoulderQuaternionOK;
   st["elbowOK"] = Arm::status.elbowQuaternionOK;
+  st["wristOK"] = Arm::status.wristQuaternionOK;
+  st["clawOK"] = Arm::status.clawQuaternionOK;
+  st["clawRangeOK"] = Arm::status.clawRangeOK;
   root.printTo(*response);
   request->send(response);
 }

@@ -47,6 +47,7 @@ void Arm::twaiCallback(CanFrame frame) {
     return;
   }
   if (ident == CAN_WRIST_QUATERNION) { 
+    Arm::status.wristQuaternionOK = true;
     wrist.imu.quaternion.deserialize(frame.data);
     return;
   }
@@ -61,7 +62,12 @@ void Arm::twaiCallback(CanFrame frame) {
   if (ident == CAN_WRIST_ACCURACY) {
     wrist.imu.accuracy.deserialize(frame.data);  
     return;
-  }     
+  }
+  if (ident == CAN_CLAW_RANGE) {
+    Arm::status.clawRangeOK = true;
+    claw.range.deserialize(frame.data);
+    return;
+  }
 }
 
 void Arm::twaiErrorCallback(CanFrame frame, int code) {  
@@ -92,6 +98,8 @@ void Arm::loop(void* parameters) {
     printf("PlatformBNO roll: %f, pitch: %f, yaw: %f, accuracy: %d\n", pEuler.getRollAngle(), pEuler.getPitchAngle(), pEuler.getYawAngle(), pAcc);
     Arm::status.shoulderQuaternionOK = false;
     Arm::status.elbowQuaternionOK = false;
+    Arm::status.wristQuaternionOK = false;
+    Arm::status.clawRangeOK = false;
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }

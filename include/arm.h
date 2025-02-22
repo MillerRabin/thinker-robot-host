@@ -7,6 +7,7 @@
 #include "armShoulder.h"
 #include "armElbow.h"
 #include "armWrist.h"
+#include "armClaw.h"
 #include "twai.h"
 #include "powerManagement.h"
 #include "AsyncJson.h"
@@ -17,6 +18,9 @@ class ArmStatus {
     bool canSendOK;
     bool shoulderQuaternionOK;
     bool elbowQuaternionOK;
+    bool wristQuaternionOK;
+    bool clawQuaternionOK;
+    bool clawRangeOK;
 };
 
 class Arm {
@@ -34,6 +38,7 @@ class Arm {
     static ArmShoulder shoulder;
     static ArmElbow elbow;
     static ArmWrist wrist;
+    static ArmClaw claw;
     static void begin(TwoWire& wire, SPIClass& spi);
     static void set(JsonObject& data);
     static void setRotate(JsonObject& data);
