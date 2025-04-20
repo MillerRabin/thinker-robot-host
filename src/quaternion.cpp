@@ -22,6 +22,13 @@ void Quaternion::convertRawData() {
   //applyRotate();
 }
 
+void Quaternion::convertRawDataByDivision(float divisor) {
+  this->i = rawI / divisor;
+  this->j = rawJ / divisor;
+  this->k = rawK / divisor;
+  this->real = rawReal / divisor;
+}
+
 bool Quaternion::set(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal) {
   uint16_t id = (rawQuatI > rawI) ? rawQuatI - rawI : rawI - rawQuatI;
   uint16_t jd = (rawQuatJ > rawJ) ? rawQuatJ - rawJ : rawJ - rawQuatJ;

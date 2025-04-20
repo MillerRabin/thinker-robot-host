@@ -46,6 +46,7 @@ void Arm::twaiCallback(CanFrame frame) {
     elbow.imu.accuracy.deserialize(frame.data);  
     return;
   }
+
   if (ident == CAN_WRIST_QUATERNION) { 
     Arm::status.wristQuaternionOK = true;
     wrist.imu.quaternion.deserialize(frame.data);
@@ -54,15 +55,19 @@ void Arm::twaiCallback(CanFrame frame) {
   if (ident == CAN_WRIST_ACCELEROMETER) {
     wrist.imu.accelerometer.deserialize(frame.data);  
     return;
-  }    
+  }
+
   if (ident == CAN_WRIST_GYROSCOPE) {
     wrist.imu.gyroscope.deserialize(frame.data);  
     return;
   }    
-  if (ident == CAN_WRIST_ACCURACY) {
-    wrist.imu.accuracy.deserialize(frame.data);  
+
+  if (ident == CAN_CLAW_QUATERNION) { 
+    Arm::status.clawQuaternionOK = true;
+    claw.imu.quaternion.deserialize(frame.data);
     return;
   }
+
   if (ident == CAN_CLAW_RANGE) {
     Arm::status.clawRangeOK = true;
     claw.range.deserialize(frame.data);
@@ -76,8 +81,7 @@ void Arm::twaiErrorCallback(CanFrame frame, int code) {
   } else {
     Arm::status.canSendOK = false;    
     printf("frame send error %d\n", frame.identifier);
-  }
-  
+  }  
 }
 
 void Arm::detectorsCallback(uint32_t id, uint64_t data) {

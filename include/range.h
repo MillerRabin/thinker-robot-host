@@ -2,12 +2,11 @@
 
 #include <Arduino.h>
 
-class Range {
-  private:
-    uint32_t range;
-    uint8_t measureType;;
+class Range {    
   public:
     uint64_t serialize();
     void deserialize(uint8_t data[8]);
-    bool set(uint32_t range, uint8_t measureType);
+    void set(uint32_t range, uint8_t measureType);
+    uint16_t range;
+    uint8_t measureType;;
 };

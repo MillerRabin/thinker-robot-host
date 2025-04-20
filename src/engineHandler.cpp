@@ -52,7 +52,18 @@ void sendSuccess(AsyncWebServerRequest *request) {
   wrist["quaternionRadianAccuracy"] = wa.quaternionRadAccuracy;
   wrist["accelerometerAccuracy"] = wa.accelerometerAccuracy;
   wrist["gyroscopeAccuracy"] = wa.gyroscopeAccuracy;
-  
+
+  JsonObject& claw = root.createNestedObject("claw");
+  Quaternion cquat = Arm::claw.imu.getQuaternion();
+  auto rangeDetector = Arm::claw.range;
+  claw["i"] = cquat.i;
+  claw["j"] = cquat.j;
+  claw["k"] = cquat.k;
+  claw["real"] = cquat.real;
+
+  claw["distance"] = rangeDetector.range;
+  claw["distanceMeasureType"] = rangeDetector.measureType;
+
   JsonObject& st = root.createNestedObject("status");
   
   st["canSendOK"] = Arm::status.canSendOK;
