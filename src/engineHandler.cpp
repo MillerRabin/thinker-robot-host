@@ -1,11 +1,13 @@
 #include "engineHandler.h"
+#include <ArduinoJson.h>
 
-void sendSuccess(AsyncWebServerRequest *request) {
-  AsyncResponseStream *response = request->beginResponseStream("application/json");
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject& root = jsonBuffer.createObject();
-   
-  JsonObject& platform = root.createNestedObject("platform");
+void sendSuccess(AsyncWebServerRequest *request) {  
+  DynamicJsonDocument doc(2048);
+
+  JsonObject root = doc.to<JsonObject>();
+
+  // --- platform ---
+  JsonObject platform = root.createNestedObject("platform");
   Quaternion pquat = Arm::platform.imu.getQuaternion();
   Accuracy pa = Arm::platform.imu.accuracy;
   platform["i"] = pquat.i;
@@ -17,9 +19,10 @@ void sendSuccess(AsyncWebServerRequest *request) {
   platform["accelerometerAccuracy"] = pa.accelerometerAccuracy;
   platform["gyroscopeAccuracy"] = pa.gyroscopeAccuracy;
 
-  JsonObject& shoulder = root.createNestedObject("shoulder");    
+  // --- shoulder ---
+  JsonObject shoulder = root.createNestedObject("shoulder");
   Quaternion squat = Arm::shoulder.imu.getQuaternion();
-  Accuracy sa = Arm::shoulder.imu.accuracy;  
+  Accuracy sa = Arm::shoulder.imu.accuracy;
   shoulder["i"] = squat.i;
   shoulder["j"] = squat.j;
   shoulder["k"] = squat.k;
@@ -29,9 +32,10 @@ void sendSuccess(AsyncWebServerRequest *request) {
   shoulder["accelerometerAccuracy"] = sa.accelerometerAccuracy;
   shoulder["gyroscopeAccuracy"] = sa.gyroscopeAccuracy;
 
-  JsonObject& elbow = root.createNestedObject("elbow");
+  // --- elbow ---
+  JsonObject elbow = root.createNestedObject("elbow");
   Quaternion equat = Arm::elbow.imu.getQuaternion();
-  Accuracy ea = Arm::elbow.imu.accuracy;  
+  Accuracy ea = Arm::elbow.imu.accuracy;
   elbow["i"] = equat.i;
   elbow["j"] = equat.j;
   elbow["k"] = equat.k;
@@ -41,9 +45,10 @@ void sendSuccess(AsyncWebServerRequest *request) {
   elbow["accelerometerAccuracy"] = ea.accelerometerAccuracy;
   elbow["gyroscopeAccuracy"] = ea.gyroscopeAccuracy;
 
-  JsonObject& wrist = root.createNestedObject("wrist");
+  // --- wrist ---
+  JsonObject wrist = root.createNestedObject("wrist");
   Quaternion wquat = Arm::wrist.imu.getQuaternion();
-  Accuracy wa = Arm::wrist.imu.accuracy;  
+  Accuracy wa = Arm::wrist.imu.accuracy;
   wrist["i"] = wquat.i;
   wrist["j"] = wquat.j;
   wrist["k"] = wquat.k;
@@ -53,37 +58,43 @@ void sendSuccess(AsyncWebServerRequest *request) {
   wrist["accelerometerAccuracy"] = wa.accelerometerAccuracy;
   wrist["gyroscopeAccuracy"] = wa.gyroscopeAccuracy;
 
-  JsonObject& claw = root.createNestedObject("claw");
+  // --- claw ---
+  JsonObject claw = root.createNestedObject("claw");
   Quaternion cquat = Arm::claw.imu.getQuaternion();
-  auto rangeDetector = Arm::claw.range;
   claw["i"] = cquat.i;
   claw["j"] = cquat.j;
   claw["k"] = cquat.k;
   claw["real"] = cquat.real;
+  claw["distance"] = Arm::claw.range.range;
+  claw["distanceMeasureType"] = Arm::claw.range.measureType;
 
-  claw["distance"] = rangeDetector.range;
-  claw["distanceMeasureType"] = rangeDetector.measureType;
-
-  JsonObject& st = root.createNestedObject("status");
-  
+  // --- status ---
+  JsonObject st = root.createNestedObject("status");
   st["canSendOK"] = Arm::status.canSendOK;
   st["shoulderOK"] = Arm::status.shoulderQuaternionOK;
   st["elbowOK"] = Arm::status.elbowQuaternionOK;
   st["wristOK"] = Arm::status.wristQuaternionOK;
   st["clawOK"] = Arm::status.clawQuaternionOK;
   st["clawRangeOK"] = Arm::status.clawRangeOK;
-  root.printTo(*response);
+  st["shoulderStatuses"] = Arm::status.shoulderStatuses;
+
+  // --- powerManagement ---
+  JsonObject power = root.createNestedObject("powerManagement");
+  power["enginesEnabled"] = Arm::powerManagement.getEnginesStatus();
+  power["cameraEnabled"] = Arm::powerManagement.getCameraStatus();
+
+  // --- send response ---
+  AsyncResponseStream *response = request->beginResponseStream("application/json");
+  serializeJson(doc, *response);
   request->send(response);
 }
 
-void sendStatus(AsyncWebServerRequest *request, StatusResponse response) {
+void sendStatus(AsyncWebServerRequest *request, const StatusResponse &response) {
   AsyncResponseStream *resp = request->beginResponseStream("application/json");
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject& root = jsonBuffer.createObject();
-   
-  root["message"] = response.message.c_str();
-  root["code"] = response.code;
-  root.printTo(*resp);
+  DynamicJsonDocument doc(256);
+  doc["message"] = response.message;
+  doc["code"] = response.code;
+  serializeJson(doc, *resp);
   request->send(resp);
 }
 
@@ -92,22 +103,31 @@ void enableEngineHandler() {
     request->send(200);
   });
 
-  AsyncCallbackJsonWebHandler* engineHandler = new AsyncCallbackJsonWebHandler("/set", [](AsyncWebServerRequest *request, JsonVariant &json) mutable {    
-    JsonObject& jsonObj = json.as<JsonObject>();
-    Arm::set(jsonObj);    
-    sendSuccess(request);  
-  });
+  AsyncCallbackJsonWebHandler *engineHandler = new AsyncCallbackJsonWebHandler("/set", [](AsyncWebServerRequest *request, JsonVariant json) {    
+    if (!json.is<JsonObject>()) {
+      request->send(400, "application/json", "{\"error\":\"Invalid JSON object\"}");
+      return;
+    }
+    
+    JsonObject jsonObj = json.as<JsonObject>();
+    Arm::set(jsonObj);
+    sendSuccess(request); });
 
   Server.on("/setRotate", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
     request->send(200);
   });
 
-  AsyncCallbackJsonWebHandler* rotationHandler = new AsyncCallbackJsonWebHandler("/setRotate", [](AsyncWebServerRequest *request, JsonVariant &json) mutable {    
-    JsonObject& jsonObj = json.as<JsonObject>();
-    Arm::setRotate(jsonObj);    
+  AsyncCallbackJsonWebHandler *rotationHandler = new AsyncCallbackJsonWebHandler("/setRotate", [](AsyncWebServerRequest *request, JsonVariant json) {
+    if (!json.is<JsonObject>()) {
+      request->send(400, "application/json", "{\"error\":\"Invalid JSON object\"}");
+      return;
+    }
+
+    JsonObject jsonObj = json.as<JsonObject>();
+    Arm::setRotate(jsonObj);
     sendSuccess(request);
   });
-  
+
   Server.on("/status", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {  
     request->send(200);
   });
@@ -119,14 +139,18 @@ void enableEngineHandler() {
   Server.on("/upgrade", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {  
     request->send(200);
   });
-  
 
-  AsyncCallbackJsonWebHandler* upgradeHandler = new AsyncCallbackJsonWebHandler("/upgrade", [](AsyncWebServerRequest *request, JsonVariant &json) mutable {    
-    JsonObject& jsonObj = json.as<JsonObject>();
+  AsyncCallbackJsonWebHandler *upgradeHandler = new AsyncCallbackJsonWebHandler("/upgrade", [](AsyncWebServerRequest *request, JsonVariant json) {
+    if (!json.is<JsonObject>()) {
+      request->send(400, "application/json", "{\"error\":\"Invalid JSON object\"}");
+      return;
+    }
+
+    JsonObject jsonObj = json.as<JsonObject>();
     auto status = Arm::upgrade(jsonObj);
-    sendStatus(request, status);
+    sendStatus(request, status); 
   });
-  
+
   Server.addHandler(engineHandler); 
   Server.addHandler(rotationHandler); 
   Server.addHandler(statusHandler); 

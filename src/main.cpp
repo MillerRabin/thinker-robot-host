@@ -36,18 +36,18 @@ bool enableWIFI() {
 }
 
 void enableVersion() {
-  Server.on("/version", HTTP_POST, [](AsyncWebServerRequest *request){
+  Server.on("/version", HTTP_POST, [](AsyncWebServerRequest *request) {
     AsyncResponseStream *response = request->beginResponseStream("application/json");
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject &root = jsonBuffer.createObject();
-    root["version"] = appVersion;
-    root["chipModel"] = ESP.getChipModel();
-    root["free-heap"] = ESP.getFreeHeap();
-    root["cores"] = ESP.getChipCores();
-    root["frequencyMHz"] = ESP.getCpuFreqMHz();
-    root["flashChipSize"] = ESP.getFlashChipSize();
-    root.printTo(*response);
-    request->send(response);
+    DynamicJsonDocument doc(256);
+    doc["version"] = appVersion;
+    doc["chipModel"] = ESP.getChipModel();
+    doc["free-heap"] = ESP.getFreeHeap();
+    doc["cores"] = ESP.getChipCores();
+    doc["frequencyMHz"] = ESP.getCpuFreqMHz();
+    doc["flashChipSize"] = ESP.getFlashChipSize();
+
+    serializeJson(doc, *response);
+    request->send(response); 
   });
 }
 

@@ -28,7 +28,12 @@ void Arm::twaiCallback(CanFrame frame) {
   if (ident == CAN_SHOULDER_ACCURACY) {
     shoulder.imu.accuracy.deserialize(frame.data);
     return;
-  }    
+  }
+  if (ident == CAN_SHOULDER_STATUSES) {
+    memcpy(&Arm::status.shoulderStatuses, frame.data, 8);
+    return;
+  }
+
   if (ident == CAN_ELBOW_QUATERNION) {
     Arm::status.elbowQuaternionOK = true;
     elbow.imu.quaternion.deserialize(frame.data);
@@ -92,14 +97,14 @@ void Arm::detectorsCallback(uint32_t id, uint64_t data) {
 
 void Arm::loop(void* parameters) {
   while (true) {
-    Quaternion sQuat = shoulder.imu.quaternion;    
-    Euler sEuler = sQuat.getEuler();
-    uint8_t sAcc = shoulder.imu.accuracy.quaternionAccuracy;
+    //Quaternion sQuat = shoulder.imu.quaternion;    
+    //Euler sEuler = sQuat.getEuler();
+    //uint8_t sAcc = shoulder.imu.accuracy.quaternionAccuracy;
             
-    printf("ShoulderBNO roll:  %f, pitch: %f, yaw: %f, accuracy: %d\n", sEuler.getRollAngle(), sEuler.getPitchAngle(), sEuler.getYawAngle(), sAcc);
-    Euler pEuler = platform.imu.quaternion.getEuler();
-    uint8_t pAcc = platform.imu.accuracy.quaternionAccuracy;  
-    printf("PlatformBNO roll: %f, pitch: %f, yaw: %f, accuracy: %d\n", pEuler.getRollAngle(), pEuler.getPitchAngle(), pEuler.getYawAngle(), pAcc);
+    //printf("ShoulderBNO roll:  %f, pitch: %f, yaw: %f, accuracy: %d\n", sEuler.getRollAngle(), sEuler.getPitchAngle(), sEuler.getYawAngle(), sAcc);
+    //Euler pEuler = platform.imu.quaternion.getEuler();
+    //uint8_t pAcc = platform.imu.accuracy.quaternionAccuracy;  
+    //printf("PlatformBNO roll: %f, pitch: %f, yaw: %f, accuracy: %d\n", pEuler.getRollAngle(), pEuler.getPitchAngle(), pEuler.getYawAngle(), pAcc);
     Arm::status.shoulderQuaternionOK = false;
     Arm::status.elbowQuaternionOK = false;
     Arm::status.wristQuaternionOK = false;
@@ -109,10 +114,9 @@ void Arm::loop(void* parameters) {
 }
 
 void Arm::begin(TwoWire& wire, SPIClass& spi) {
-  powerManagement.begin();    
-  //shoulder.imu.quaternion.setRotate(0.0F, 0.7071F, 0.0F, 0.7071F);
+  powerManagement.begin();      
   //powerManagement.enableCamera();
-  powerManagement.enableEngines();  
+  //powerManagement.enableEngines();  
   twai.begin(twaiCallback, twaiErrorCallback);
   platform.begin(wire, spi, detectorsCallback); 
   xTaskCreate(
@@ -125,28 +129,97 @@ void Arm::begin(TwoWire& wire, SPIClass& spi) {
   );
 }
 
-bool Arm::getFloat(JsonObject& jsonObj, const char* key, float& result) {
+bool Arm::getFloat(JsonObject jsonObj, const char *key, float &result) {
   if (!jsonObj.containsKey(key))
     return false;
-  const char *str = jsonObj[key];
-  result = atof(str);
-  return true;
+
+  JsonVariant value = jsonObj[key];
+  if (value.is<float>() || value.is<long>() || value.is<double>()) {
+    result = value.as<float>();
+    return true;
+  }
+
+  if (value.is<const char *>()) {
+    const char *str = value.as<const char *>();
+    if (str) {
+      result = atof(str);
+      return true;
+    }
+  }
+
+  return false;
 }
 
-void Arm::set(JsonObject& data) {
-  float shoulderY = NAN;
+bool Arm::getBool(JsonObject jsonObj, const char *key, bool &result)
+{
+  if (!jsonObj.containsKey(key))
+    return false;
+
+  JsonVariant value = jsonObj[key];
+
+  if (value.is<bool>()) {
+    result = value.as<bool>();
+    return true;
+  }
+
+  
+  if (value.is<int>() || value.is<unsigned int>() || value.is<long>() || value.is<unsigned long>()) {
+    int intval = value.as<int>();
+    result = (intval != 0);
+    return true;
+  }
+
+  
+  if (value.is<const char *>()) {
+    const char *str = value.as<const char *>();
+    if (str == nullptr)
+      return false;
+
+    if (strcasecmp(str, "true") == 0 || strcmp(str, "1") == 0) {
+      result = true;
+      return true;
+    }
+
+    if (strcasecmp(str, "false") == 0 || strcmp(str, "0") == 0) {
+      result = false;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void Arm::set(JsonObject data) {  
+  bool enginesEnabled = false;
+  bool hasEngines = getBool(data, "enginesEnabled", enginesEnabled);  
+  bool cameraEnabled = false;
+  bool hasCamera = getBool(data, "cameraEnabled", cameraEnabled);
+  if (hasEngines)
+    enginesEnabled ? powerManagement.enableEngines() : powerManagement.disableEngines();
+
+  if (hasCamera)
+    cameraEnabled ? powerManagement.enableCamera() : powerManagement.disableCamera();
+  
+  float shoulderY = NAN;    
   bool hasShoulderY = getFloat(data, "shoulder-y", shoulderY);
   float shoulderZ = NAN;
   bool hasShoulderZ = getFloat(data, "shoulder-z", shoulderZ);
-  uint8_t shoulderData[8];
-  memcpy(shoulderData, &shoulderY, 4);
-  memcpy(&shoulderData[4], &shoulderZ, 4);
-  if (!twai.sendData(CAN_SHOULDER_SET_YZ_DEGREE, shoulderData)) {
-    printf("Error sending data\n");
+  if (hasShoulderY || hasShoulderZ) {
+    uint32_t encoded = 0;
+    if (hasShoulderY)
+      encoded |= (uint16_t)(shoulderY * 100) & 0xFFFF;
+    if (hasShoulderZ)
+      encoded |= ((uint32_t)(shoulderZ * 100) & 0xFFFF) << 16;
+
+    uint8_t shoulderData[8];
+    memcpy(shoulderData, &encoded, 4);
+    if (!twai.sendData(CAN_SHOULDER_SET_YZ_DEGREE, shoulderData)) {
+      printf("Error sending data\n");
+    }
   }
 }
 
-void Arm::setRotate(JsonObject& data) {
+void Arm::setRotate(JsonObject data) {
   float shoulderReal = 0;
   getFloat(data, "shoulder-real", shoulderReal);
   float shoulderI = 0;
@@ -165,7 +238,7 @@ void Arm::setRotate(JsonObject& data) {
   }*/
 }
 
-StatusResponse Arm::upgrade(JsonObject& data) {      
+StatusResponse Arm::upgrade(JsonObject data) {      
   uint8_t sData[8] = { 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA };
   if (!data.containsKey("part")) {
    return StatusResponse({ "No key of part found", RESPONSE_STATUS_NO_ARM_PART_KEY_FOUND });
