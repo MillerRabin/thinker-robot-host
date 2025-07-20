@@ -8,6 +8,7 @@ Accelerometer LocalBNO::accelerometer;
 Gyroscope LocalBNO::gyroscope;
 Accuracy LocalBNO::accuracy;
 TaskHandle_t LocalBNO::taskHandle;
+SemaphoreHandle_t LocalBNO::loopMutex;
 const uint32_t LocalBNO::notificationIndex = 0;
 
 void LocalBNO::interruptHandler() {
@@ -19,9 +20,10 @@ void LocalBNO::interruptHandler() {
 
 void LocalBNO::begin(SPIClass& spi, DetectorsCallback callback) {
   LocalBNO::callback = callback;
-          
+  LocalBNO::loopMutex = xSemaphoreCreateMutex();
   if (!bno.beginSPI(IMU_SPI_CS_GPIO, IMU_WAKE_GPIO, IMU_INT_GPIO, IMU_RST_GPIO, IMU_SPI_SPEED, spi)) {
     Serial.println(F("BNO080 not detected at SPI"));
+    return;
   }
   
   attachInterrupt(digitalPinToInterrupt(imuIntPin), interruptHandler, FALLING);
@@ -60,14 +62,17 @@ void LocalBNO::loop(void* parameters) {
       printf("LocalBNO notificationResult error %d\n", notificationValue);
       continue;                
     }
-    if (quaternion.set(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal))
-      callback(CAN_PLATFORM_QUATERNION, quaternion.serialize());
-    if (accelerometer.set(bno.rawLinAccelX, bno.rawLinAccelY, bno.rawLinAccelZ))
-      callback(CAN_PLATFORM_ACCELEROMETER, accelerometer.serialize());
-    if (gyroscope.set(bno.rawGyroX, bno.rawGyroY, bno.rawGyroZ))
-      callback(CAN_PLATFORM_GYROSCOPE, gyroscope.serialize());
-    if (accuracy.set(bno.rawQuatRadianAccuracy, bno.quatAccuracy, bno.gyroAccuracy, bno.accelLinAccuracy))
-      callback(CAN_PLATFORM_ACCURACY, gyroscope.serialize());
+    if (xSemaphoreTake(LocalBNO::loopMutex, pdMS_TO_TICKS(100))) {
+      if (quaternion.set(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal))
+        callback(CAN_PLATFORM_QUATERNION, quaternion.serialize());
+      if (accelerometer.set(bno.rawLinAccelX, bno.rawLinAccelY, bno.rawLinAccelZ))
+        callback(CAN_PLATFORM_ACCELEROMETER, accelerometer.serialize());
+      if (gyroscope.set(bno.rawGyroX, bno.rawGyroY, bno.rawGyroZ))
+        callback(CAN_PLATFORM_GYROSCOPE, gyroscope.serialize());
+      if (accuracy.set(bno.rawQuatRadianAccuracy, bno.quatAccuracy, bno.gyroAccuracy, bno.accelLinAccuracy))
+        callback(CAN_PLATFORM_ACCURACY, accuracy.serialize());
+      xSemaphoreGive(LocalBNO::loopMutex);
+    }
   }
 }
 
@@ -85,6 +90,11 @@ void LocalBNO::printData() {
 }
 
 Quaternion LocalBNO::getQuaternion() {
-  quaternion.convertRawData();
+  if (xSemaphoreTake(LocalBNO::loopMutex, pdMS_TO_TICKS(100))) {
+    quaternion.convertRawData();
+    xSemaphoreGive(LocalBNO::loopMutex);    
+  } else {
+    Serial.println("Can't obtain loop semaphore lock");
+  }
   return quaternion;
 }
