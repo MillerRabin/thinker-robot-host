@@ -52,6 +52,11 @@ void Arm::twaiCallback(CanFrame frame) {
     return;
   }
 
+  if (ident == CAN_ELBOW_STATUSES) {
+    memcpy(&Arm::status.elbowStatuses, frame.data, 8);
+    return;
+  }
+
   if (ident == CAN_WRIST_QUATERNION) { 
     Arm::status.wristQuaternionOK = true;
     wrist.imu.quaternion.deserialize(frame.data);
@@ -65,7 +70,12 @@ void Arm::twaiCallback(CanFrame frame) {
   if (ident == CAN_WRIST_GYROSCOPE) {
     wrist.imu.gyroscope.deserialize(frame.data);  
     return;
-  }    
+  }
+
+  if (ident == CAN_WRIST_STATUSES) {
+    memcpy(&Arm::status.wristStatuses, frame.data, 8);
+    return;
+  }
 
   if (ident == CAN_CLAW_QUATERNION) { 
     Arm::status.clawQuaternionOK = true;
@@ -76,6 +86,11 @@ void Arm::twaiCallback(CanFrame frame) {
   if (ident == CAN_CLAW_RANGE) {
     Arm::status.clawRangeOK = true;
     claw.range.deserialize(frame.data);
+    return;
+  }
+
+  if (ident == CAN_CLAW_STATUSES) {
+    memcpy(&Arm::status.clawStatuses, frame.data, 8);
     return;
   }
 }
@@ -130,6 +145,10 @@ void Arm::begin(TwoWire& wire, SPIClass& spi) {
 }
 
 bool Arm::getFloat(JsonObject jsonObj, const char *key, float &result) {
+  if (key == NULL) {
+    return false;
+  }
+
   if (!jsonObj.containsKey(key))
     return false;
 
@@ -189,9 +208,9 @@ bool Arm::getBool(JsonObject jsonObj, const char *key, bool &result)
   return false;
 }
 
-void Arm::set(JsonObject data) {  
+void Arm::setPowerState(JsonObject data) {
   bool enginesEnabled = false;
-  bool hasEngines = getBool(data, "enginesEnabled", enginesEnabled);  
+  bool hasEngines = getBool(data, "enginesEnabled", enginesEnabled);
   bool cameraEnabled = false;
   bool hasCamera = getBool(data, "cameraEnabled", cameraEnabled);
   if (hasEngines)
@@ -199,23 +218,66 @@ void Arm::set(JsonObject data) {
 
   if (hasCamera)
     cameraEnabled ? powerManagement.enableCamera() : powerManagement.disableCamera();
+}
+bool Arm::sendArmData(
+    JsonObject data,
+    const char *keyY,
+    const char *keyZ,
+    const char *keyX,
+    const char *keyAux,
+    const uint32_t canMessage)
+{
+  float valY = NAN;
+  bool hasValY = getFloat(data, keyY, valY);
+  float valZ = NAN;
+  bool hasValZ = getFloat(data, keyZ, valZ);
+  float valX = NAN;
+  bool hasValX = getFloat(data, keyX, valX);
+  float valAux = NAN;
+  bool hasValAux = getFloat(data, keyAux, valAux);
   
-  float shoulderY = NAN;    
-  bool hasShoulderY = getFloat(data, "shoulder-y", shoulderY);
-  float shoulderZ = NAN;
-  bool hasShoulderZ = getFloat(data, "shoulder-z", shoulderZ);
-  if (hasShoulderY || hasShoulderZ) {
-    uint32_t encoded = 0;
-    if (hasShoulderY)
-      encoded |= (uint16_t)(shoulderY * 100) & 0xFFFF;
-    if (hasShoulderZ)
-      encoded |= ((uint32_t)(shoulderZ * 100) & 0xFFFF) << 16;
+  auto isValid = [](float v) {
+    return v >= 0.0f && v <= 270.0f;
+  };
 
-    uint8_t shoulderData[8];
-    memcpy(shoulderData, &encoded, 4);
-    if (!twai.sendData(CAN_SHOULDER_SET_YZ_DEGREE, shoulderData)) {
-      printf("Error sending data\n");
-    }
+  if ((hasValY && !isValid(valY)) ||
+      (hasValZ && !isValid(valZ)) ||
+      (hasValX && !isValid(valX)) ||
+      (hasValAux && !isValid(valAux))) {    
+    return false;
+  }
+
+  if (hasValY || hasValZ || hasValX || hasValAux) {
+    ArmDataFrame frame;
+    frame.values.y = hasValY ? (int16_t)(valY * 100) : 0;
+    frame.values.z = hasValZ ? (int16_t)(valZ * 100) : 0;
+    frame.values.x = hasValX ? (int16_t)(valX * 100) : 0;
+    frame.values.aux = hasValAux ? (int16_t)(valAux * 100) : 0;
+    return twai.sendData(canMessage, frame.bytes);
+  }
+  
+  return false;
+}
+
+void Arm::set(JsonObject data) {
+  setPowerState(data);
+
+  struct
+  {
+    const char *y;
+    const char *z;
+    const char *x;
+    const char *aux;
+    const uint32_t canId;
+    const char *name;
+  } actions[] = {
+      {"shoulder-y", "shoulder-z", nullptr, nullptr, CAN_SHOULDER_SET_YZ_DEGREE, "shoulder"},
+      {"elbow-y", nullptr, nullptr, nullptr, CAN_ELBOW_SET_Y_DEGREE, "elbow"},
+      {"wrist-y", "wrist-z", nullptr, nullptr, CAN_WRIST_SET_YZ_DEGREE, "wrist"},
+      {"claw-y", "claw-z", "claw-x", "claw-gripper", CAN_CLAW_SET_XYZG_DEGREE, "claw"}};
+
+  for (auto &action : actions) {
+    sendArmData(data, action.y, action.z, action.x, action.aux, action.canId);
   }
 }
 

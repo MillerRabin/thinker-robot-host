@@ -1,7 +1,8 @@
 #include "engineHandler.h"
 #include <ArduinoJson.h>
 
-void sendSuccess(AsyncWebServerRequest *request) {  
+void sendSuccess(AsyncWebServerRequest *request)
+{
   DynamicJsonDocument doc(2048);
 
   JsonObject root = doc.to<JsonObject>();
@@ -77,6 +78,9 @@ void sendSuccess(AsyncWebServerRequest *request) {
   st["clawOK"] = Arm::status.clawQuaternionOK;
   st["clawRangeOK"] = Arm::status.clawRangeOK;
   st["shoulderStatuses"] = Arm::status.shoulderStatuses;
+  st["elbowStatuses"] = Arm::status.elbowStatuses;
+  st["wristStatuses"] = Arm::status.wristStatuses;
+  st["clawStatuses"] = Arm::status.clawStatuses;
 
   // --- powerManagement ---
   JsonObject power = root.createNestedObject("powerManagement");
@@ -89,7 +93,8 @@ void sendSuccess(AsyncWebServerRequest *request) {
   request->send(response);
 }
 
-void sendStatus(AsyncWebServerRequest *request, const StatusResponse &response) {
+void sendStatus(AsyncWebServerRequest *request, const StatusResponse &response)
+{
   AsyncResponseStream *resp = request->beginResponseStream("application/json");
   DynamicJsonDocument doc(256);
   doc["message"] = response.message;
@@ -98,12 +103,13 @@ void sendStatus(AsyncWebServerRequest *request, const StatusResponse &response) 
   request->send(resp);
 }
 
-void enableEngineHandler() {  
-  Server.on("/set", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
-    request->send(200);
-  });
+void enableEngineHandler()
+{
+  Server.on("/set", HTTP_OPTIONS, [](AsyncWebServerRequest *request)
+            { request->send(200); });
 
-  AsyncCallbackJsonWebHandler *engineHandler = new AsyncCallbackJsonWebHandler("/set", [](AsyncWebServerRequest *request, JsonVariant json) {    
+  AsyncCallbackJsonWebHandler *engineHandler = new AsyncCallbackJsonWebHandler("/set", [](AsyncWebServerRequest *request, JsonVariant json)
+                                                                               {    
     if (!json.is<JsonObject>()) {
       request->send(400, "application/json", "{\"error\":\"Invalid JSON object\"}");
       return;
@@ -113,11 +119,11 @@ void enableEngineHandler() {
     Arm::set(jsonObj);
     sendSuccess(request); });
 
-  Server.on("/setRotate", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
-    request->send(200);
-  });
+  Server.on("/setRotate", HTTP_OPTIONS, [](AsyncWebServerRequest *request)
+            { request->send(200); });
 
-  AsyncCallbackJsonWebHandler *rotationHandler = new AsyncCallbackJsonWebHandler("/setRotate", [](AsyncWebServerRequest *request, JsonVariant json) {
+  AsyncCallbackJsonWebHandler *rotationHandler = new AsyncCallbackJsonWebHandler("/setRotate", [](AsyncWebServerRequest *request, JsonVariant json)
+                                                                                 {
     if (!json.is<JsonObject>()) {
       request->send(400, "application/json", "{\"error\":\"Invalid JSON object\"}");
       return;
@@ -125,22 +131,19 @@ void enableEngineHandler() {
 
     JsonObject jsonObj = json.as<JsonObject>();
     Arm::setRotate(jsonObj);
-    sendSuccess(request);
-  });
+    sendSuccess(request); });
 
-  Server.on("/status", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {  
-    request->send(200);
-  });
-  
-  AsyncCallbackJsonWebHandler* statusHandler = new AsyncCallbackJsonWebHandler("/status", [](AsyncWebServerRequest *request, JsonVariant &json) mutable {
-    sendSuccess(request);
-  });
+  Server.on("/status", HTTP_OPTIONS, [](AsyncWebServerRequest *request)
+            { request->send(200); });
 
-  Server.on("/upgrade", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {  
-    request->send(200);
-  });
+  AsyncCallbackJsonWebHandler *statusHandler = new AsyncCallbackJsonWebHandler("/status", [](AsyncWebServerRequest *request, JsonVariant &json) mutable
+                                                                               { sendSuccess(request); });
 
-  AsyncCallbackJsonWebHandler *upgradeHandler = new AsyncCallbackJsonWebHandler("/upgrade", [](AsyncWebServerRequest *request, JsonVariant json) {
+  Server.on("/upgrade", HTTP_OPTIONS, [](AsyncWebServerRequest *request)
+            { request->send(200); });
+
+  AsyncCallbackJsonWebHandler *upgradeHandler = new AsyncCallbackJsonWebHandler("/upgrade", [](AsyncWebServerRequest *request, JsonVariant json)
+                                                                                {
     if (!json.is<JsonObject>()) {
       request->send(400, "application/json", "{\"error\":\"Invalid JSON object\"}");
       return;
@@ -148,11 +151,10 @@ void enableEngineHandler() {
 
     JsonObject jsonObj = json.as<JsonObject>();
     auto status = Arm::upgrade(jsonObj);
-    sendStatus(request, status); 
-  });
+    sendStatus(request, status); });
 
-  Server.addHandler(engineHandler); 
-  Server.addHandler(rotationHandler); 
-  Server.addHandler(statusHandler); 
-  Server.addHandler(upgradeHandler); 
+  Server.addHandler(engineHandler);
+  Server.addHandler(rotationHandler);
+  Server.addHandler(statusHandler);
+  Server.addHandler(upgradeHandler);
 }

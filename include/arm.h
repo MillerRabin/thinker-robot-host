@@ -22,6 +22,20 @@ class ArmStatus {
     bool clawQuaternionOK;
     bool clawRangeOK;
     uint64_t shoulderStatuses;
+    uint64_t elbowStatuses;
+    uint64_t wristStatuses;
+    uint64_t clawStatuses;
+};
+
+union ArmDataFrame
+{
+  struct {
+    int16_t y;
+    int16_t z;
+    int16_t x;
+    int16_t aux;
+  } values;
+  uint8_t bytes[8];
 };
 
 class Arm {
@@ -33,16 +47,24 @@ class Arm {
     static void loop(void* parameters);
     static bool getFloat(JsonObject jsonObj, const char* key, float& result);
     static bool getBool(JsonObject jsonObj, const char* key, bool& result);
-  public:
-    static ArmStatus status;
-    static ArmPlatform platform;
-    static ArmShoulder shoulder;
-    static ArmElbow elbow;
-    static ArmWrist wrist;
-    static ArmClaw claw;
-    static PowerManagement powerManagement;
-    static void begin(TwoWire& wire, SPIClass& spi);
-    static void set(JsonObject data);
-    static void setRotate(JsonObject data);
-    static StatusResponse upgrade(JsonObject data);
-};
+    static void setPowerState(JsonObject data);
+    static bool sendArmData(
+        JsonObject data,
+        const char *keyY,
+        const char *keyZ,
+        const char *keyX,
+        const char *keyAux,
+        const uint32_t canMessage);
+    public:
+      static ArmStatus status;
+      static ArmPlatform platform;
+      static ArmShoulder shoulder;
+      static ArmElbow elbow;
+      static ArmWrist wrist;
+      static ArmClaw claw;
+      static PowerManagement powerManagement;
+      static void begin(TwoWire & wire, SPIClass & spi);
+      static void set(JsonObject data);
+      static void setRotate(JsonObject data);
+      static StatusResponse upgrade(JsonObject data);
+    };
