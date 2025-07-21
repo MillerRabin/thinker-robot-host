@@ -19,7 +19,8 @@ class LocalBNO {
     static void printData();
     static void loop(void* parameters);
     static DetectorsCallback callback;
-    static SemaphoreHandle_t loopMutex;    
+    static SemaphoreHandle_t loopMutex;
+    static void initBNO();
   public:    
     static void begin(SPIClass& spi, DetectorsCallback callback);
     static Quaternion quaternion;
