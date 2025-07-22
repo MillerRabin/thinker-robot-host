@@ -6,6 +6,10 @@ float StructureBase::qToFloat(int16_t fixedPointValue, uint8_t qPoint) {
   return qFloat;
 }
 
-uint16_t StructureBase::floatToQ(float q, uint8_t qPoint){
+uint16_t StructureBase::floatToQ(float q, uint8_t qPoint) {
   return (int16_t) (q * pow(2, qPoint));
+}
+
+uint32_t StructureBase::floatToQ32(float q, uint8_t qPoint) {
+  return (int32_t)(q * pow(2, qPoint));
 }

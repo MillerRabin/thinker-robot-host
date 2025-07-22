@@ -1,6 +1,5 @@
 #include "remoteWitmotion.h"
 
-Quaternion RemoteWitmotion::getQuaternion() {
-  this->quaternion.convertRawDataByDivision(32768.0);
+Quaternion RemoteWitmotion::getQuaternion() {  
   return Quaternion(this->quaternion);
 }

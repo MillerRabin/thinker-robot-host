@@ -1,48 +1,33 @@
 #include "quaternion.h"
 
 uint64_t IMUQuaternion::serialize() {
-  return (uint64_t)this->rawI |
-         (uint64_t)this->rawJ << 16 |
-         (uint64_t)this->rawK << 32 |
-         (uint64_t)this->rawReal << 48;
+  uint64_t rawI = floatToQ(i, Q1);
+  uint64_t rawJ = floatToQ(j, Q1);
+  uint64_t rawK = floatToQ(k, Q1);
+  uint64_t rawReal = floatToQ(real, Q1);
+  return (uint64_t)rawI |
+         (uint64_t)rawJ << 16 |
+         (uint64_t)rawK << 32 |
+         (uint64_t)rawReal << 48;
 }
 
-void IMUQuaternion::deserialize(uint8_t data[8]) {
-  this->rawI = (uint16_t)data[1] << 8 | data[0];
-  this->rawJ = (uint16_t)data[3] << 8 | data[2];
-  this->rawK = (uint16_t)data[5] << 8 | data[4];
-  this->rawReal = (uint16_t)data[7] << 8 | data[6];
+bool IMUQuaternion::setBNO(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal) {
+  this->i = qToFloat(rawQuatI, Q1);
+  this->j = qToFloat(rawQuatJ, Q1);
+  this->k = qToFloat(rawQuatK, Q1);
+  this->real = qToFloat(rawQuatReal, Q1);
+  return true;  
 }
 
-void IMUQuaternion::convertRawData() {
-  this->i = qToFloat(rawI, Q1);
-  this->j = qToFloat(rawJ, Q1);
-  this->k = qToFloat(rawK, Q1);
-  this->real = qToFloat(rawReal, Q1);
-  //applyRotate();
+bool IMUQuaternion::setWitmotion(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal, float divisor) {
+  this->i = rawQuatI / divisor;
+  this->j = rawQuatJ / divisor;
+  this->k = rawQuatK / divisor;
+  this->real = rawQuatReal / divisor;
+  return true;
 }
 
-void IMUQuaternion::convertRawDataByDivision(float divisor) {
-  this->i = rawI / divisor;
-  this->j = rawJ / divisor;
-  this->k = rawK / divisor;
-  this->real = rawReal / divisor;
-}
-
-bool IMUQuaternion::set(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal) {
-  uint16_t id = (rawQuatI > rawI) ? rawQuatI - rawI : rawI - rawQuatI;
-  uint16_t jd = (rawQuatJ > rawJ) ? rawQuatJ - rawJ : rawJ - rawQuatJ;
-  uint16_t kd = (rawQuatK > rawK) ? rawQuatK - rawK : rawK - rawQuatK;
-  uint16_t rd = (rawQuatReal >rawReal) ? rawQuatReal - rawReal : rawReal - rawQuatReal;
-  this->rawI = rawQuatI;
-  this->rawJ = rawQuatJ;
-  this->rawK = rawQuatK;
-  this->rawReal = rawQuatReal;
-  return ((id > 1) || (jd > 1) || (kd > 1) || (rd > 1));
-}
-
-Euler IMUQuaternion::getEuler() {
-  convertRawData();  
+Euler IMUQuaternion::getEuler() {  
   float dqw = real;
 	float dqx = i;
 	float dqy = j;
@@ -67,13 +52,34 @@ Euler IMUQuaternion::getEuler() {
   	
 	float t0 = +2.0 * (dqw * dqx + dqy * dqz);
 	float t1 = +1.0 - 2.0 * (dqx * dqx + ysqr);
-	float roll = atan2(t0, t1);
-	  
+	float roll = atan2(t0, t1);	   
   return Euler(roll, pitch, yaw);
 }
 
+void IMUQuaternion::deserialize(uint8_t data[8]) {
+  uint16_t rawI = (uint16_t)data[1] << 8 | data[0];
+  uint16_t rawJ = (uint16_t)data[3] << 8 | data[2];
+  uint16_t rawK = (uint16_t)data[5] << 8 | data[4];
+  uint16_t rawReal = (uint16_t)data[7] << 8 | data[6];
+  this->i = qToFloat(rawI, Q1);
+  this->j = qToFloat(rawJ, Q1);
+  this->k = qToFloat(rawK, Q1);
+  this->real = qToFloat(rawReal, Q1);
+}
+
+void IMUQuaternion::multiplyFirst(const Quaternion &b) {
+  float r = real;
+  float x = i;
+  float y = j;
+  float z = k;
+
+  real = b.real * r - b.i * x - b.j * y - b.k * z;
+  i = b.real * x + b.i * r + b.j * z - b.k * y;
+  j = b.real * y - b.i * z + b.j * r + b.k * x;
+  k = b.real * z + b.i * y - b.j * x + b.k * r;
+}
+
 Quaternion::Quaternion(IMUQuaternion &q) {  
-  q.convertRawData();
   i = q.i;
   j = q.j;
   k = q.k;

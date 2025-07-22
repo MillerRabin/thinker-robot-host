@@ -270,6 +270,7 @@ public:
 	void sendCommand(uint8_t command);
 	void sendCalibrateCommand(uint8_t thingToCalibrate);
 	void sendTareCommand(uint8_t command, uint8_t axis=TARE_AXIS_ALL, uint8_t rotationVectorBasis=TARE_ROTATION_VECTOR);
+	bool writeFRSRecord(uint16_t frsType, uint32_t *dataWords, uint8_t wordCount);
 
 	//Metadata functions
 	int16_t getQ1(uint16_t recordID);

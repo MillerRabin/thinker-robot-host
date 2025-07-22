@@ -1,6 +1,5 @@
 #include "remoteBNO.h"
 
-Quaternion RemoteBNO::getQuaternion(){
-  this->quaternion.convertRawData();
+Quaternion RemoteBNO::getQuaternion() {
   return Quaternion(this->quaternion);
 }

@@ -116,6 +116,20 @@ void LocalBNO::begin(SPIClass& spi, DetectorsCallback callback) {
     return;
   }
 
+  /*uint32_t quaternionFRS[4] = {
+    StructureBase::floatToQ32(rotateQuatenion.real, 30),
+    StructureBase::floatToQ32(rotateQuatenion.i, 30),
+    StructureBase::floatToQ32(rotateQuatenion.j, 30),
+    StructureBase::floatToQ32(rotateQuatenion.k, 30)
+  };
+
+  printf("Writing real: 0x%x, i: 0x%x, j:0x%x, k:0x%x\n", quaternionFRS[0], quaternionFRS[1], quaternionFRS[2], quaternionFRS[3]);
+  if (bno.writeFRSRecord(0x2D3E, quaternionFRS, 4)) {
+    printf("FRS Orientation is written\n");
+  } else {
+    printf("Can't save FRS Orientation\n");
+  }*/
+
   attachInterrupt(digitalPinToInterrupt(imuIntPin), interruptHandler, FALLING);
   interrupts();
   
@@ -148,8 +162,10 @@ void LocalBNO::loop(void* parameters) {
       continue;                
     }
     if (xSemaphoreTake(LocalBNO::loopMutex, pdMS_TO_TICKS(IMU_WAIT_MUTEX))) {
-      if (quaternion.set(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal))
+      if (quaternion.setBNO(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal)) {
+        quaternion.multiplyFirst(rotateQuatenion);
         callback(CAN_PLATFORM_QUATERNION, quaternion.serialize());
+      }
       if (accelerometer.set(bno.rawLinAccelX, bno.rawLinAccelY, bno.rawLinAccelZ))
         callback(CAN_PLATFORM_ACCELEROMETER, accelerometer.serialize());
       if (gyroscope.set(bno.rawGyroX, bno.rawGyroY, bno.rawGyroZ))
@@ -189,9 +205,8 @@ void LocalBNO::printData() {
 }
 
 Quaternion LocalBNO::getQuaternion() {  
-  if (xSemaphoreTake(LocalBNO::loopMutex, pdMS_TO_TICKS(IMU_WAIT_MUTEX))) { 
-    quaternion.convertRawData();           
-    lastQuaternion = rotateQuatenion * quaternion;
+  if (xSemaphoreTake(LocalBNO::loopMutex, pdMS_TO_TICKS(IMU_WAIT_MUTEX))) {     
+    lastQuaternion = Quaternion(quaternion);
     xSemaphoreGive(LocalBNO::loopMutex);
   } else {
     Serial.println("Can't obtain loop semaphore lock");
