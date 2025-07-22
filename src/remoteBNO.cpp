@@ -2,5 +2,5 @@
 
 Quaternion RemoteBNO::getQuaternion(){
   this->quaternion.convertRawData();
-  return this->quaternion;
+  return Quaternion(this->quaternion);
 }

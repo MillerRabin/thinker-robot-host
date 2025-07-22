@@ -8,7 +8,7 @@ class RemoteBNO {
     int16_t rotationVector_Q1 = 14;  
   public:
     Quaternion getQuaternion();
-    Quaternion quaternion;
+    IMUQuaternion quaternion;
     Accelerometer accelerometer;
     Gyroscope gyroscope;
     Accuracy accuracy;
