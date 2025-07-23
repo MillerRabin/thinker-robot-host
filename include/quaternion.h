@@ -18,8 +18,8 @@ public:
   uint64_t serialize();
   void deserialize(uint8_t data[8]);
   Euler getEuler();
-  bool setBNO(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal);  
-  bool setWitmotion(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal, float divisor);
+  bool fromBNO(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal);  
+  bool fromWitmotion(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal, float divisor);
   void multiplyFirst(const Quaternion &b);
 };
 

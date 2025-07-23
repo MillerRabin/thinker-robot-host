@@ -162,7 +162,7 @@ void LocalBNO::loop(void* parameters) {
       continue;                
     }
     if (xSemaphoreTake(LocalBNO::loopMutex, pdMS_TO_TICKS(IMU_WAIT_MUTEX))) {
-      if (quaternion.setBNO(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal)) {
+      if (quaternion.fromBNO(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal)) {
         quaternion.multiplyFirst(rotateQuatenion);
         callback(CAN_PLATFORM_QUATERNION, quaternion.serialize());
       }

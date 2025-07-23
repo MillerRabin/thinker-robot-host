@@ -11,7 +11,7 @@ uint64_t IMUQuaternion::serialize() {
          (uint64_t)rawReal << 48;
 }
 
-bool IMUQuaternion::setBNO(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal) {
+bool IMUQuaternion::fromBNO(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal) {
   this->i = qToFloat(rawQuatI, Q1);
   this->j = qToFloat(rawQuatJ, Q1);
   this->k = qToFloat(rawQuatK, Q1);
@@ -19,7 +19,7 @@ bool IMUQuaternion::setBNO(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQua
   return true;  
 }
 
-bool IMUQuaternion::setWitmotion(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal, float divisor) {
+bool IMUQuaternion::fromWitmotion(uint16_t rawQuatI, uint16_t rawQuatJ, uint16_t rawQuatK, uint16_t rawQuatReal, float divisor) {
   this->i = rawQuatI / divisor;
   this->j = rawQuatJ / divisor;
   this->k = rawQuatK / divisor;
