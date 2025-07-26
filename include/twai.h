@@ -15,18 +15,15 @@ class TWAI {
     const static uint txPin;
     static CanFrame rxFrame;
     static TWAICallback callback;
-    static TWAIErrorCallback errorCallback;
-    static void loop(void* parameters);
-    static bool read();    
-    static CanMap canSendMap;    
-    static void loopTask(void* parameters);
+    static TWAIErrorCallback errorCallback; 
+    static CanMap canSendMap;
+    static CanMap canReceiveMap;
+    static SemaphoreHandle_t receiveSemaphore;
+    static SemaphoreHandle_t sendSemaphore;
+    static void callbackTask(void* parameters);
     static void sendTask(void* parameters);
     static void receiveTask(void* parameters);
-    static QueueHandle_t receiveQueue;
-    static volatile uint32_t droppedFramesCount;
   public:
-    static SemaphoreHandle_t sendSemaphore;
-    static uint32_t getDroppedFrames();
     static void begin(TWAICallback callback, TWAIErrorCallback errorCallback);    
     static bool sendData(uint32_t id, uint8_t* data);
 };

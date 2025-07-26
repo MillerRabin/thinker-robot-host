@@ -5,12 +5,12 @@ const uint TWAI::txPin = TWAI_TX_GPIO;
 TWAICallback TWAI::callback;
 TWAIErrorCallback TWAI::errorCallback;
 SemaphoreHandle_t TWAI::sendSemaphore;
-QueueHandle_t TWAI::receiveQueue;
-volatile uint32_t TWAI::droppedFramesCount = 0;
+SemaphoreHandle_t TWAI::receiveSemaphore;
 
 CanFrame TWAI::rxFrame = {0};
 
 CanMap TWAI::canSendMap;
+CanMap TWAI::canReceiveMap;
 
 bool TWAI::sendData(uint32_t id, uint8_t* data) {
   CanFrame obdFrame = { 0 };
@@ -36,6 +36,12 @@ void TWAI::begin(TWAICallback callback, TWAIErrorCallback errorCallback) {
     return;
   }
 
+  TWAI::receiveSemaphore = xSemaphoreCreateMutex();
+  if (TWAI::receiveSemaphore == NULL) {
+    Serial.println("receiveSemaphore allocation failed!");
+    return;
+  }
+
   if (ESP32Can.begin(ESP32Can.convertSpeed(1000), txPin, rxPin, 10, 10)) {
     Serial.println("CAN bus started!");
   }
@@ -44,29 +50,17 @@ void TWAI::begin(TWAICallback callback, TWAIErrorCallback errorCallback) {
     return;
   }
 
-  TWAI::receiveQueue = xQueueCreate(CAN_RECEIVE_QUEUE_SIZE, sizeof(CanFrame));
-  if (TWAI::receiveQueue == NULL)
-  {
-    Serial.println("Failed to create receiveQueue!");
-    return;
-  }
-
-  xTaskCreate(loopTask, "TWAI::loop", 4096, NULL, 2, NULL);
+  xTaskCreate(callbackTask, "TWAI::callbackTask", 4096, NULL, 2, NULL);
   xTaskCreate(receiveTask, "TWAI::receive", 4096, NULL, 5, NULL);
   xTaskCreate(sendTask, "TWAI::send", 4096, NULL, 5, NULL);
 }
 
-bool TWAI::read() {  
-  return ESP32Can.readFrame(rxFrame, 100);      
-}
-
 void TWAI::receiveTask(void *parameters) {
   while (true) {
-    if (read())
-    {      
-      if (xQueueSend(receiveQueue, &rxFrame, 0) != pdTRUE) {
-        TWAI::droppedFramesCount++;
-        Serial.println("receiveQueue full, frame dropped");
+    if (ESP32Can.readFrame(rxFrame, 100)) {
+      if (xSemaphoreTake(TWAI::receiveSemaphore, pdMS_TO_TICKS(1)) == pdTRUE) {
+        TWAI::canReceiveMap[rxFrame.identifier] = rxFrame;
+        xSemaphoreGive(TWAI::receiveSemaphore);
       }
     }
   }
@@ -107,16 +101,19 @@ void TWAI::sendTask(void *parameters)
   }
 }
 
-void TWAI::loopTask(void *parameters) {
-  Serial.printf("Loop task started\n");
-  CanFrame frame;
+void TWAI::callbackTask(void *parameters) {
+  TickType_t lastWakeTime = xTaskGetTickCount();
   while (true) {
-    if (xQueueReceive(receiveQueue, &frame, pdMS_TO_TICKS(CAN_RECEIVE_WAIT_MESSAGE)) == pdTRUE) {
-      callback(frame);
+    CanMap localCopy;
+    if (xSemaphoreTake(TWAI::receiveSemaphore, pdMS_TO_TICKS(CAN_RECEIVE_WAIT_TIMEOUT)) == pdTRUE) {
+      localCopy = std::move(TWAI::canReceiveMap);
+      TWAI::canReceiveMap.clear();
+      xSemaphoreGive(TWAI::receiveSemaphore);
     }
-  }
-}
 
-uint32_t TWAI::getDroppedFrames() {
-  return TWAI::droppedFramesCount;
+    for (auto &item : localCopy) {
+      callback(item.second);
+    }
+    vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(CAN_RECEIVE_LOOP_TIMEOUT));
+  }
 }
