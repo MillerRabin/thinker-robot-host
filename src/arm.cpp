@@ -271,10 +271,10 @@ void Arm::set(JsonObject data) {
     const uint32_t canId;
     const char *name;
   } actions[] = {
-      {"shoulder-y", "shoulder-z", nullptr, nullptr, CAN_SHOULDER_SET_YZ_DEGREE, "shoulder"},
-      {"elbow-y", nullptr, nullptr, nullptr, CAN_ELBOW_SET_Y_DEGREE, "elbow"},
-      {"wrist-y", "wrist-z", nullptr, nullptr, CAN_WRIST_SET_YZ_DEGREE, "wrist"},
-      {"claw-y", "claw-z", "claw-x", "claw-gripper", CAN_CLAW_SET_XYZG_DEGREE, "claw"}};
+      {"shoulder-y", "shoulder-z", "time-ms", nullptr, CAN_SHOULDER_SET_YZ_DEGREE, "shoulder"},
+      {"elbow-y", "time-ms", nullptr, nullptr, CAN_ELBOW_SET_Y_DEGREE, "elbow"},
+      {"wrist-y", "wrist-z", "time-ms", nullptr, CAN_WRIST_SET_YZ_DEGREE, "wrist"},
+      {"claw-y", "claw-x", "claw-gripper", "time-ms", CAN_CLAW_SET_XYG_DEGREE, "claw"}};
 
   for (auto &action : actions) {
     sendArmData(data, action.y, action.z, action.x, action.aux, action.canId);

@@ -6,15 +6,12 @@ DetectorsCallback LocalBNO::callback;
 IMUQuaternion LocalBNO::quaternion;
 Quaternion LocalBNO::lastQuaternion;
 
-float rollOffset = 0.9f * (PI / 180.0f);
-float pitchOffset = -1.680f * (PI / 180.0f);
+float rollOffset = 0.0f * (PI / 180.0f);
+float pitchOffset = 0.0f * (PI / 180.0f);
 
 Quaternion errorQuat = Quaternion::FromEuler(rollOffset, pitchOffset, 0.0f);
 Quaternion correctionQuat = Quaternion::Conjugate(errorQuat);
 Quaternion LocalBNO::rotateQuatenion = Quaternion::Multiply(correctionQuat, {-0.7071f, 0.7071f, 0.0f, 0.0f});
-
-// Quaternion LocalBNO::rotateQuatenion = {-0.7071f, 0.7071f, 0.0f, 0.0f};
-// Quaternion LocalBNO::rotateQuatenion = {-0.0098599f, 0.0146595f, -0.0001445f, 0.9998439f};
 
 /// East-North-Up (ENU)
 //Quaternion LocalBNO::rotateQuatenion = {0.0f, 0.0f, 0.0f, 1.0f};
