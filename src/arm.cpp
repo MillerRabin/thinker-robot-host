@@ -221,38 +221,38 @@ void Arm::setPowerState(JsonObject data) {
 }
 bool Arm::sendArmData(
     JsonObject data,
-    const char *keyY,
-    const char *keyZ,
-    const char *keyX,
-    const char *keyAux,
-    const uint32_t canMessage)
-{
-  float valY = NAN;
-  bool hasValY = getFloat(data, keyY, valY);
-  float valZ = NAN;
-  bool hasValZ = getFloat(data, keyZ, valZ);
-  float valX = NAN;
-  bool hasValX = getFloat(data, keyX, valX);
-  float valAux = NAN;
-  bool hasValAux = getFloat(data, keyAux, valAux);
+    const char *key1,
+    const char *key2,
+    const char *key3,
+    const char *key4,
+    const uint32_t canMessage) {
+  float val1 = NAN;
+  bool hasVal1 = getFloat(data, key1, val1);
+  float val2 = NAN;
+  bool hasVal2 = getFloat(data, key2, val2);
+  float val3 = NAN;
+  bool hasVal3 = getFloat(data, key3, val3);
+  float val4 = NAN;
+  bool hasVal4 = getFloat(data, key4, val4);
   
   auto isValid = [](float v) {
-    return v >= 0.0f && v <= 270.0f;
+    return v >= 0.0f && v <= 320.0f;
   };
 
-  if ((hasValY && !isValid(valY)) ||
-      (hasValZ && !isValid(valZ)) ||
-      (hasValX && !isValid(valX)) ||
-      (hasValAux && !isValid(valAux))) {    
+
+  if ((hasVal1 && !isValid(val1)) ||
+      (hasVal2 && !isValid(val2)) ||
+      (hasVal3 && !isValid(val3)) ||
+      (hasVal4 && !isValid(val4))) {    
     return false;
   }
 
-  if (hasValY || hasValZ || hasValX || hasValAux) {
+  if (hasVal1 || hasVal2 || hasVal3 || hasVal4) {
     ArmDataFrame frame;
-    frame.values.y = hasValY ? (int16_t)(valY * 100) : 0;
-    frame.values.z = hasValZ ? (int16_t)(valZ * 100) : 0;
-    frame.values.x = hasValX ? (int16_t)(valX * 100) : 0;
-    frame.values.aux = hasValAux ? (int16_t)(valAux * 100) : 0;
+    frame.values.param1 = hasVal1 ? (int16_t)(val1 * 100) : 0;
+    frame.values.param2 = hasVal2 ? (int16_t)(val2 * 100) : 0;
+    frame.values.param3 = hasVal3 ? (int16_t)(val3 * 100) : 0;
+    frame.values.param4 = hasVal4 ? (int16_t)(val4 * 100) : 0;
     return twai.sendData(canMessage, frame.bytes);
   }
   
@@ -262,22 +262,21 @@ bool Arm::sendArmData(
 void Arm::set(JsonObject data) {
   setPowerState(data);
 
-  struct
-  {
-    const char *y;
-    const char *z;
-    const char *x;
-    const char *aux;
+  struct {
+    const char *param1;
+    const char *param2;
+    const char *param3;
+    const char *param4;
     const uint32_t canId;
     const char *name;
   } actions[] = {
-      {"shoulder-y", "shoulder-z", "time-ms", nullptr, CAN_SHOULDER_SET_YZ_DEGREE, "shoulder"},
-      {"elbow-y", "time-ms", nullptr, nullptr, CAN_ELBOW_SET_Y_DEGREE, "elbow"},
-      {"wrist-y", "wrist-z", "time-ms", nullptr, CAN_WRIST_SET_YZ_DEGREE, "wrist"},
-      {"claw-y", "claw-x", "claw-gripper", "time-ms", CAN_CLAW_SET_XYG_DEGREE, "claw"}};
+      {"shoulder-y", "shoulder-z", "time", nullptr, CAN_SHOULDER_SET_YZ_DEGREE, "shoulder"},
+      {"elbow-y", "time", nullptr, nullptr, CAN_ELBOW_SET_Y_DEGREE, "elbow"},
+      {"wrist-y", "wrist-z", "time", nullptr, CAN_WRIST_SET_YZ_DEGREE, "wrist"},
+      {"claw-y", "claw-x", "claw-gripper", "time", CAN_CLAW_SET_XYG_DEGREE, "claw"}};
 
   for (auto &action : actions) {
-    sendArmData(data, action.y, action.z, action.x, action.aux, action.canId);
+    sendArmData(data, action.param1, action.param2, action.param3, action.param4, action.canId);
   }
 }
 

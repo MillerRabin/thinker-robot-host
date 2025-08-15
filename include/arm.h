@@ -30,10 +30,10 @@ class ArmStatus {
 union ArmDataFrame
 {
   struct {
-    int16_t y;
-    int16_t z;
-    int16_t x;
-    int16_t aux;
+    int16_t param1;
+    int16_t param2;
+    int16_t param3;
+    int16_t param4;
   } values;
   uint8_t bytes[8];
 };
@@ -55,16 +55,17 @@ class Arm {
         const char *keyX,
         const char *keyAux,
         const uint32_t canMessage);
-    public:
-      static ArmStatus status;
-      static ArmPlatform platform;
-      static ArmShoulder shoulder;
-      static ArmElbow elbow;
-      static ArmWrist wrist;
-      static ArmClaw claw;
-      static PowerManagement powerManagement;
-      static void begin(TwoWire & wire, SPIClass & spi);
-      static void set(JsonObject data);
-      static void setRotate(JsonObject data);
-      static StatusResponse upgrade(JsonObject data);
+
+  public:
+    static ArmStatus status;
+    static ArmPlatform platform;
+    static ArmShoulder shoulder;
+    static ArmElbow elbow;
+    static ArmWrist wrist;
+    static ArmClaw claw;
+    static PowerManagement powerManagement;
+    static void begin(TwoWire &wire, SPIClass &spi);
+    static void set(JsonObject data);
+    static void setRotate(JsonObject data);
+    static StatusResponse upgrade(JsonObject data);
     };
