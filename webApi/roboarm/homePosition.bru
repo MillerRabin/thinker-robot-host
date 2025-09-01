@@ -1,0 +1,25 @@
+meta {
+  name: homePosition
+  type: http
+  seq: 5
+}
+
+post {
+  url: http://192.168.1.120/set
+  body: json
+  auth: none
+}
+
+body:json {
+  {    
+      "shoulder-y": 90,
+      "shoulder-z": 135,
+      "elbow-y": 90,
+      "wrist-y": 90,
+      "wrist-z": 135,
+      "claw-y": 60,
+      "claw-x": 90,
+      "time": 10,
+      "enginesEnabled": true
+  }
+}

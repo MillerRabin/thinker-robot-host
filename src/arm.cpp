@@ -112,18 +112,11 @@ void Arm::detectorsCallback(uint32_t id, uint64_t data) {
 
 void Arm::loop(void* parameters) {
   while (true) {
-    //Quaternion sQuat = shoulder.imu.quaternion;    
-    //Euler sEuler = sQuat.getEuler();
-    //uint8_t sAcc = shoulder.imu.accuracy.quaternionAccuracy;
-            
-    //printf("ShoulderBNO roll:  %f, pitch: %f, yaw: %f, accuracy: %d\n", sEuler.getRollAngle(), sEuler.getPitchAngle(), sEuler.getYawAngle(), sAcc);
-    //Euler pEuler = platform.imu.quaternion.getEuler();
-    //uint8_t pAcc = platform.imu.accuracy.quaternionAccuracy;  
-    //printf("PlatformBNO roll: %f, pitch: %f, yaw: %f, accuracy: %d\n", pEuler.getRollAngle(), pEuler.getPitchAngle(), pEuler.getYawAngle(), pAcc);
     Arm::status.shoulderQuaternionOK = false;
     Arm::status.elbowQuaternionOK = false;
     Arm::status.wristQuaternionOK = false;
     Arm::status.clawRangeOK = false;
+    Arm::status.clawQuaternionOK = false;
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
@@ -249,10 +242,10 @@ bool Arm::sendArmData(
 
   if (hasVal1 || hasVal2 || hasVal3 || hasVal4) {
     ArmDataFrame frame;
-    frame.values.param1 = hasVal1 ? (int16_t)(val1 * 100) : 0;
-    frame.values.param2 = hasVal2 ? (int16_t)(val2 * 100) : 0;
-    frame.values.param3 = hasVal3 ? (int16_t)(val3 * 100) : 0;
-    frame.values.param4 = hasVal4 ? (int16_t)(val4 * 100) : 0;
+    frame.values.param1 = hasVal1 ? (int16_t)(val1 * 100) : PARAMETER_IS_NAN;
+    frame.values.param2 = hasVal2 ? (int16_t)(val2 * 100) : PARAMETER_IS_NAN;
+    frame.values.param3 = hasVal3 ? (int16_t)(val3 * 100) : PARAMETER_IS_NAN;
+    frame.values.param4 = hasVal4 ? (int16_t)(val4 * 100) : PARAMETER_IS_NAN;
     return twai.sendData(canMessage, frame.bytes);
   }
   
