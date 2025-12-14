@@ -41,12 +41,3 @@ public:
   void deserialize(uint8_t data[8]);
   bool set(uint16_t rawGyroX, uint16_t rawGyroY, uint16_t rawGyroZ);
 };
-
-class Barometer {
-public:
-  float pressure;
-  float temperature;
-  uint64_t serialize();
-  void deserialize(uint8_t data[8]);
-  bool set(float pressure, float temperature);
-};

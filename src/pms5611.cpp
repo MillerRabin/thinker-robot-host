@@ -1,5 +1,6 @@
 
 #include "pms5611.h"
+#include "barometer.h"
 
 MS5611 PMS5611::ms(0x77);
 Barometer PMS5611::barometer;
@@ -30,12 +31,13 @@ void PMS5611::loop(void* parameters) {
       Serial.print("Error in read: ");
       Serial.println(result);
     } else {
-      if (barometer.set(ms.getPressure(), ms.getTemperature())) {        
-        callback(CAN_PLATFORM_BAROMETER, barometer.serialize());
-      }
-        
+      uint16_t pressure = (uint16_t)(ms.getPressure() * 100);
+      uint8_t temperature = (uint8_t)(ms.getTemperature());
+      uint16_t height = (uint16_t)(44330.0 * (1.0 - pow(pressure / 101325.0, 0.1903)));
+      barometer.set(height, pressure, temperature);
+      callback(CAN_PLATFORM_BAROMETER, barometer.serialize());
     }
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 

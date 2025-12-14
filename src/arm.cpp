@@ -89,6 +89,11 @@ void Arm::twaiCallback(CanFrame frame) {
     return;
   }
 
+  if (ident == CAN_CLAW_HEIGHT) {
+    claw.barometer.deserialize(frame.data);
+    return;
+  }
+
   if (ident == CAN_CLAW_STATUSES) {
     memcpy(&Arm::status.clawStatuses, frame.data, 8);
     return;

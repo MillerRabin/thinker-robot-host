@@ -70,21 +70,3 @@ void Accuracy::deserialize(uint8_t data[8]) {
   this->quaternionRadAccuracy = (uint16_t)data[3] << 8 | data[2];
   this->gyroscopeAccuracy = data[4];  
 }
-
-uint64_t Barometer::serialize() {
-  return (uint64_t)this->pressure |
-         (uint64_t)this->temperature << 32;  
-}
-
-void Barometer::deserialize(uint8_t data[8]) {
-  memcpy(&pressure, data, 4);
-  memcpy(&temperature, &data[4], 4);  
-}
-
-bool Barometer::set(float pressure, float temperature) {
-  float pd = (this->pressure > pressure) ? this->pressure - pressure : pressure - this->pressure;
-  float td = (this->temperature > temperature) ? this->temperature - temperature : temperature - this->temperature;  
-  this->temperature = temperature;
-  this->pressure = pressure;
-  return (pd > 0.1) || (td > 0.1);
-}
