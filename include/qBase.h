@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 
-class StructureBase {
+class QBase {
   public:
     static float qToFloat(int16_t fixedPointValue, uint8_t qPoint);
     static uint16_t floatToQ(float q, uint8_t qPoint);

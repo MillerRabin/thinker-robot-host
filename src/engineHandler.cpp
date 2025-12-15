@@ -20,17 +20,16 @@ void sendSuccess(AsyncWebServerRequest *request)
   platform["accelerometerAccuracy"] = pa.accelerometerAccuracy;
   platform["gyroscopeAccuracy"] = pa.gyroscopeAccuracy;
 
-  platform["accelerometerX"] = Arm::platform.imu.accelerometer.x;
-  platform["accelerometerY"] = Arm::platform.imu.accelerometer.y;
-  platform["accelerometerZ"] = Arm::platform.imu.accelerometer.z;
+  platform["accelerometerX"] = Arm::platform.imu.accelerometer.bnoX();
+  platform["accelerometerY"] = Arm::platform.imu.accelerometer.bnoY();
+  platform["accelerometerZ"] = Arm::platform.imu.accelerometer.bnoZ();
 
-  platform["gyroX"] = Arm::platform.imu.gyroscope.x;
-  platform["gyroY"] = Arm::platform.imu.gyroscope.y;
-  platform["gyroZ"] = Arm::platform.imu.gyroscope.z;
+  platform["gyroX"] = Arm::platform.imu.gyroscope.bnoX();
+  platform["gyroY"] = Arm::platform.imu.gyroscope.bnoY();
+  platform["gyroZ"] = Arm::platform.imu.gyroscope.bnoZ();
 
   platform["height"] = Arm::platform.ms.barometer.getHeight();
   platform["temperature"] = Arm::platform.ms.barometer.getTemperature();
-  platform["pressure"] = Arm::platform.ms.barometer.getPressure();
   
   // --- shoulder ---
   JsonObject shoulder = root.createNestedObject("shoulder");
@@ -45,12 +44,12 @@ void sendSuccess(AsyncWebServerRequest *request)
   shoulder["accelerometerAccuracy"] = sa.accelerometerAccuracy;
   shoulder["gyroscopeAccuracy"] = sa.gyroscopeAccuracy;
 
-  shoulder["accelerometerX"] = Arm::shoulder.imu.accelerometer.x;
-  shoulder["accelerometerY"] = Arm::shoulder.imu.accelerometer.y;
-  shoulder["accelerometerZ"] = Arm::shoulder.imu.accelerometer.z;
-  shoulder["gyroX"] = Arm::shoulder.imu.gyroscope.x;
-  shoulder["gyroY"] = Arm::shoulder.imu.gyroscope.y;
-  shoulder["gyroZ"] = Arm::shoulder.imu.gyroscope.z;
+  shoulder["accelerometerX"] = Arm::shoulder.imu.accelerometer.bnoX();
+  shoulder["accelerometerY"] = Arm::shoulder.imu.accelerometer.bnoY();
+  shoulder["accelerometerZ"] = Arm::shoulder.imu.accelerometer.bnoZ();
+  shoulder["gyroX"] = Arm::shoulder.imu.gyroscope.bnoX();
+  shoulder["gyroY"] = Arm::shoulder.imu.gyroscope.bnoY();
+  shoulder["gyroZ"] = Arm::shoulder.imu.gyroscope.bnoZ();
   
   // --- elbow ---
   JsonObject elbow = root.createNestedObject("elbow");
@@ -65,12 +64,12 @@ void sendSuccess(AsyncWebServerRequest *request)
   elbow["accelerometerAccuracy"] = ea.accelerometerAccuracy;
   elbow["gyroscopeAccuracy"] = ea.gyroscopeAccuracy;
   
-  elbow["accelerometerX"] = Arm::elbow.imu.accelerometer.x;
-  elbow["accelerometerY"] = Arm::elbow.imu.accelerometer.y;
-  elbow["accelerometerZ"] = Arm::elbow.imu.accelerometer.z;
-  elbow["gyroX"] = Arm::elbow.imu.gyroscope.x;
-  elbow["gyroY"] = Arm::elbow.imu.gyroscope.y;
-  elbow["gyroZ"] = Arm::elbow.imu.gyroscope.z;
+  elbow["accelerometerX"] = Arm::elbow.imu.accelerometer.bnoX();
+  elbow["accelerometerY"] = Arm::elbow.imu.accelerometer.bnoY();
+  elbow["accelerometerZ"] = Arm::elbow.imu.accelerometer.bnoZ();
+  elbow["gyroX"] = Arm::elbow.imu.gyroscope.bnoX();
+  elbow["gyroY"] = Arm::elbow.imu.gyroscope.bnoY();
+  elbow["gyroZ"] = Arm::elbow.imu.gyroscope.bnoZ();
 
   // --- wrist ---
   JsonObject wrist = root.createNestedObject("wrist");
@@ -84,12 +83,12 @@ void sendSuccess(AsyncWebServerRequest *request)
   wrist["quaternionRadianAccuracy"] = wa.quaternionRadAccuracy;
   wrist["accelerometerAccuracy"] = wa.accelerometerAccuracy;
   wrist["gyroscopeAccuracy"] = wa.gyroscopeAccuracy;
-  wrist["accelerometerX"] = Arm::wrist.imu.accelerometer.x;
-  wrist["accelerometerY"] = Arm::wrist.imu.accelerometer.y;
-  wrist["accelerometerZ"] = Arm::wrist.imu.accelerometer.z;
-  wrist["gyroX"] = Arm::wrist.imu.gyroscope.x;
-  wrist["gyroY"] = Arm::wrist.imu.gyroscope.y;
-  wrist["gyroZ"] = Arm::wrist.imu.gyroscope.z;
+  wrist["accelerometerX"] = Arm::wrist.imu.accelerometer.bnoX();
+  wrist["accelerometerY"] = Arm::wrist.imu.accelerometer.bnoY();
+  wrist["accelerometerZ"] = Arm::wrist.imu.accelerometer.bnoZ();
+  wrist["gyroX"] = Arm::wrist.imu.gyroscope.bnoX();
+  wrist["gyroY"] = Arm::wrist.imu.gyroscope.bnoY();
+  wrist["gyroZ"] = Arm::wrist.imu.gyroscope.bnoZ();
 
   // --- claw ---
   JsonObject claw = root.createNestedObject("claw");
@@ -101,16 +100,15 @@ void sendSuccess(AsyncWebServerRequest *request)
   claw["distance"] = Arm::claw.range.range;
   claw["distanceMeasureType"] = Arm::claw.range.measureType;
 
-  claw["accelerometerX"] = Arm::claw.imu.accelerometer.x;
-  claw["accelerometerY"] = Arm::claw.imu.accelerometer.y;
-  claw["accelerometerZ"] = Arm::claw.imu.accelerometer.z; 
-  claw["gyroX"] = Arm::claw.imu.gyroscope.x;
-  claw["gyroY"] = Arm::claw.imu.gyroscope.y;
-  claw["gyroZ"] = Arm::claw.imu.gyroscope.z;
+  claw["accelerometerX"] = Arm::claw.imu.accelerometer.witMotionX();
+  claw["accelerometerY"] = Arm::claw.imu.accelerometer.witMotionY();
+  claw["accelerometerZ"] = Arm::claw.imu.accelerometer.witMotionZ(); 
+  claw["gyroX"] = Arm::claw.imu.gyroscope.witMotionX();
+  claw["gyroY"] = Arm::claw.imu.gyroscope.witMotionY();
+  claw["gyroZ"] = Arm::claw.imu.gyroscope.witMotionZ();
 
   claw["height"] = Arm::claw.barometer.getHeight();
-  claw["temperature"] = Arm::claw.barometer.getTemperature();
-  claw["pressure"] = Arm::claw.barometer.getPressure();
+  claw["temperature"] = Arm::claw.barometer.getTemperature();  
 
   // --- status ---
   JsonObject st = root.createNestedObject("status");

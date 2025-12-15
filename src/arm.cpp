@@ -83,6 +83,16 @@ void Arm::twaiCallback(CanFrame frame) {
     return;
   }
 
+  if (ident == CAN_CLAW_ACCELEROMETER) {
+    claw.imu.accelerometer.deserialize(frame.data);    
+    return;
+  }
+
+  if (ident == CAN_CLAW_GYROSCOPE) {
+    claw.imu.gyroscope.deserialize(frame.data);
+    return;
+  }
+
   if (ident == CAN_CLAW_RANGE) {
     Arm::status.clawRangeOK = true;
     claw.range.deserialize(frame.data);

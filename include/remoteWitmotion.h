@@ -2,6 +2,8 @@
 
 #include "structures.h"
 #include "quaternion.h"
+#include "accelerometer.h"
+#include "gyroscope.h"
 
 class RemoteWitmotion {
   private:

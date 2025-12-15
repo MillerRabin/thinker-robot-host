@@ -3,6 +3,8 @@
 #include <SparkFun_BNO080_Arduino_Library.h>
 #include <Arduino.h>
 #include <Wire.h>
+#include "accelerometer.h"
+#include "gyroscope.h"
 
 #include "structures.h"
 #include "quaternion.h"

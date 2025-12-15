@@ -1,12 +1,12 @@
 #pragma once
 
 #include <Arduino.h>
-#include "structureBase.h"
+#include "qBase.h"
 #include "euler.h"
 
 class Quaternion;
 
-class IMUQuaternion : public StructureBase {
+class IMUQuaternion : public QBase {
 public:
   float i;
   float j;

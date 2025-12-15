@@ -101,7 +101,7 @@ void LocalBNO::interruptHandler() {
 
 void LocalBNO::initBNO() {
   bno.enableRotationVector(50);
-  bno.enableLinearAccelerometer(50);
+  bno.enableAccelerometer(50);
   bno.enableGyro(50);
 }
 
@@ -163,12 +163,13 @@ void LocalBNO::loop(void* parameters) {
         quaternion.multiplyFirst(rotateQuatenion);
         callback(CAN_PLATFORM_QUATERNION, quaternion.serialize());
       }
-      if (accelerometer.set(bno.rawLinAccelX, bno.rawLinAccelY, bno.rawLinAccelZ))
-        callback(CAN_PLATFORM_ACCELEROMETER, accelerometer.serialize());
-      if (gyroscope.set(bno.rawGyroX, bno.rawGyroY, bno.rawGyroZ))
-        callback(CAN_PLATFORM_GYROSCOPE, gyroscope.serialize());
-      if (accuracy.set(bno.rawQuatRadianAccuracy, bno.getQuatAccuracy(), bno.gyroAccuracy, bno.accelLinAccuracy))
-        callback(CAN_PLATFORM_ACCURACY, accuracy.serialize());
+            
+      accelerometer.set(bno.rawAccelX, bno.rawAccelY, bno.rawAccelZ);
+      callback(CAN_PLATFORM_ACCELEROMETER, accelerometer.serialize());      
+      gyroscope.set(bno.rawGyroX, bno.rawGyroY, bno.rawGyroZ);
+      callback(CAN_PLATFORM_GYROSCOPE, gyroscope.serialize());
+      accuracy.set(bno.rawQuatRadianAccuracy, bno.getQuatAccuracy(), bno.gyroAccuracy, bno.accelLinAccuracy);
+      callback(CAN_PLATFORM_ACCURACY, accuracy.serialize());
       xSemaphoreGive(LocalBNO::loopMutex);
 
       if (!needCalibration && bno.quatAccuracy < 3) {
