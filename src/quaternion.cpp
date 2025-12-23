@@ -117,3 +117,15 @@ Quaternion Quaternion::Multiply(const Quaternion &a, const Quaternion &b)
   q.k = a.real * b.k + a.i * b.j - a.j * b.i + a.k * b.real;
   return q;
 }
+
+uint64_t Quaternion::serialize()
+{
+  uint64_t rawI = QBase::floatToQ(i, Q1);
+  uint64_t rawJ = QBase::floatToQ(j, Q1);
+  uint64_t rawK = QBase::floatToQ(k, Q1);
+  uint64_t rawReal = QBase::floatToQ(real, Q1);
+  return (uint64_t)rawI |
+         (uint64_t)rawJ << 16 |
+         (uint64_t)rawK << 32 |
+         (uint64_t)rawReal << 48;
+}

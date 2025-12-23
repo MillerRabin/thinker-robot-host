@@ -3,8 +3,6 @@
 #include "localBNO.h"
 #include "twai.h"
 #include "pms5611.h"
-#include "structures.h"
-
 
 class ArmPlatform {  
   public:

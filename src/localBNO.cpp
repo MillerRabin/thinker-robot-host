@@ -1,10 +1,12 @@
 #include "localBNO.h"
 
 uint LocalBNO::imuIntPin = IMU_INT_GPIO;
+uint LocalBNO::imuRstPin = IMU_RST_GPIO;
+SPIClass* LocalBNO::spi = NULL;
 BNO080 LocalBNO::bno;
 DetectorsCallback LocalBNO::callback;
 IMUQuaternion LocalBNO::quaternion;
-Quaternion LocalBNO::lastQuaternion;
+LocalBNOData LocalBNO::data;
 
 float rollOffset = 0.0f * (PI / 180.0f);
 float pitchOffset = 0.0f * (PI / 180.0f);
@@ -13,78 +15,6 @@ Quaternion errorQuat = Quaternion::FromEuler(rollOffset, pitchOffset, 0.0f);
 Quaternion correctionQuat = Quaternion::Conjugate(errorQuat);
 Quaternion LocalBNO::rotateQuatenion = Quaternion::Multiply(correctionQuat, {-0.7071f, 0.7071f, 0.0f, 0.0f});
 
-/// East-North-Up (ENU)
-//Quaternion LocalBNO::rotateQuatenion = {0.0f, 0.0f, 0.0f, 1.0f};
-
-/// North-West-Up
-//Quaternion LocalBNO::rotateQuatenion = {0.0f, 0.0f, 0.7071f, 0.7071f};
-
-/// West-South-Up
-//Quaternion LocalBNO::rotateQuatenion = {0.0f, 0.0f, 1.0f, 0.0f};
-
-/// South-East-Up
-//Quaternion LocalBNO::rotateQuatenion = {0.0f, 0.0f, -0.7071f, 0.7071f};
-
-/// East-South-Down
-//Quaternion LocalBNO::rotateQuatenion = {0.0f, -1.0f, 0.0f, 0.0f};
-
-/// North-East-Down
-//Quaternion LocalBNO::rotateQuatenion = {-0.7071f, -0.7071f, 0.0f, 0.0f};
-
-/// West-North-Down
-//Quaternion LocalBNO::rotateQuatenion = {-1.0f, 0.0f, 0.0f, 0.0f};
-
-/// South-West-Down
-//Quaternion LocalBNO::rotateQuatenion = {-0.7071f, 0.7071f, 0.0f, 0.0f};
-
-/// Up-South-East
-// Quaternion LocalBNO::rotateQuatenion = {0.0f, -0.7071f, 0.7071f, 0.0f};
-
-/// North-Up-East
-// Quaternion LocalBNO::rotateQuatenion = {-0.5f, -0.5f, 0.5f, 0.5f};
-
-/// Down-North-East
-// Quaternion LocalBNO::rotateQuatenion = {-0.7071f, 0.0f, 0.0f, 0.7071f};
-
-/// South-Down-East
-// Quaternion LocalBNO::rotateQuatenion = {0.5f, -0.5f, 0.5f, -0.5f};
-
-/// Up-North-West
-// Quaternion LocalBNO::rotateQuatenion = {-0.7071f, 0.0f, 0.0f, -0.7071f};
-
-/// North-Down-West
-// Quaternion LocalBNO::rotateQuatenion = {-0.5f, -0.5f, -0.5f, -0.5f};
-
-/// Down-South-West
-// Quaternion LocalBNO::rotateQuatenion = {0.0f, -0.7071f, -0.7071f, 0.0f};
-
-/// South-Up-West
-// Quaternion LocalBNO::rotateQuatenion = {0.5f, -0.5f, 0.5f, 0.5f};
-
-/// Up-East-North
-// Quaternion LocalBNO::rotateQuatenion = {-0.5f, -0.5f, -0.5f, 0.5f};
-
-/// West-Up-North
-// Quaternion LocalBNO::rotateQuatenion = {-0.7071f, 0.0f, 0.7071f, 0.0f};
-
-/// Down-West-North
-// Quaternion LocalBNO::rotateQuatenion = {0.5f, -0.5f, 0.5f, 0.5f};
-
-/// East-Down-North
-// Quaternion LocalBNO::rotateQuatenion = {0.0f, -0.7071f, 0.0f, -0.7071f};
-
-/// Up-West-South
-// Quaternion LocalBNO::rotateQuatenion = {0.5f, -0.5f, 0.5f, -0.5f};
-
-/// West-Down-South
-// Quaternion LocalBNO::rotateQuatenion = {-0.7071f, 0.0f, -0.7071f, 0.0f};
-
-/// Down-East-South
-// Quaternion LocalBNO::rotateQuatenion = {-0.5f, -0.5f, -0.5f, -0.5f};
-
-/// East-Up-South
-// Quaternion LocalBNO::rotateQuatenion = {0.0f, -0.7071f, 0.0f, 0.7071f};
-
 Accelerometer LocalBNO::accelerometer;
 Gyroscope LocalBNO::gyroscope;
 Accuracy LocalBNO::accuracy;
@@ -92,47 +22,47 @@ TaskHandle_t LocalBNO::taskHandle;
 SemaphoreHandle_t LocalBNO::loopMutex;
 const uint32_t LocalBNO::notificationIndex = 0;
 
-void LocalBNO::interruptHandler() {
+void IRAM_ATTR LocalBNO::interruptHandler() {
   if (LocalBNO::taskHandle == NULL) return;
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;  
   vTaskNotifyGiveIndexedFromISR(LocalBNO::taskHandle, LocalBNO::notificationIndex, &xHigherPriorityTaskWoken);
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-void LocalBNO::initBNO() {
+bool LocalBNO::initBNO() {
+  (*LocalBNO::spi).end();
+
+  pinMode(IMU_SPI_SCK, OUTPUT);
+  pinMode(IMU_SPI_MOSI_GPIO, OUTPUT);
+  pinMode(IMU_SPI_MISO_GPIO, INPUT);
+  pinMode(IMU_SPI_CS_GPIO, OUTPUT);
+
+  digitalWrite(IMU_SPI_CS_GPIO, HIGH);
+  digitalWrite(IMU_SPI_SCK, HIGH);
+  digitalWrite(IMU_SPI_MOSI_GPIO, HIGH);
+
+  vTaskDelay(pdMS_TO_TICKS(100));  
+  SPI.begin(IMU_SPI_SCK, IMU_SPI_MISO_GPIO, IMU_SPI_MOSI_GPIO, IMU_SPI_CS_GPIO);    
+  if (!bno.beginSPI(IMU_SPI_CS_GPIO, IMU_WAKE_GPIO, imuIntPin, imuRstPin, IMU_SPI_SPEED, *LocalBNO::spi)) {
+    Serial.printf("BNO080 not detected at SPI\n");
+    return false;
+  }
+
+  interrupts();
+
   bno.enableRotationVector(50);
   bno.enableAccelerometer(50);
   bno.enableGyro(50);
+  return true;
 }
 
 void LocalBNO::begin(SPIClass& spi, DetectorsCallback callback) {
   LocalBNO::callback = callback;
   LocalBNO::loopMutex = xSemaphoreCreateMutex();
-  if (!bno.beginSPI(IMU_SPI_CS_GPIO, IMU_WAKE_GPIO, IMU_INT_GPIO, IMU_RST_GPIO, IMU_SPI_SPEED, spi)) {
-    Serial.println(F("BNO080 not detected at SPI"));
-    return;
-  }
+  LocalBNO::spi = &spi;
 
-  /*uint32_t quaternionFRS[4] = {
-    StructureBase::floatToQ32(rotateQuatenion.real, 30),
-    StructureBase::floatToQ32(rotateQuatenion.i, 30),
-    StructureBase::floatToQ32(rotateQuatenion.j, 30),
-    StructureBase::floatToQ32(rotateQuatenion.k, 30)
-  };
-
-  printf("Writing real: 0x%x, i: 0x%x, j:0x%x, k:0x%x\n", quaternionFRS[0], quaternionFRS[1], quaternionFRS[2], quaternionFRS[3]);
-  if (bno.writeFRSRecord(0x2D3E, quaternionFRS, 4)) {
-    printf("FRS Orientation is written\n");
-  } else {
-    printf("Can't save FRS Orientation\n");
-  }*/
-
+  pinMode(imuIntPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(imuIntPin), interruptHandler, FALLING);
-  interrupts();
-  
-  initBNO();
-
-  bno.getReadings();
   
   xTaskCreate(
     loop,
@@ -147,33 +77,50 @@ void LocalBNO::begin(SPIClass& spi, DetectorsCallback callback) {
 void LocalBNO::loop(void* parameters) {
   uint32_t notificationValue;   
   bool needCalibration = false; 
-  while (true) {
-    if (bno.hasReset()) {
-      printf("IMU was reset. Re-enabling sensor...\n");
-      initBNO();
+  uint errorCount = 0;
+
+  while(true) {
+    if (!initBNO()) {
+      Serial.printf("Failed to initialize BNO080\n");      
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
     }
-    bno.getReadings();    
-    notificationValue = ulTaskNotifyTakeIndexed(LocalBNO::notificationIndex, pdTRUE, pdMS_TO_TICKS(50));      
-    if(notificationValue == 0) {
-      printf("LocalBNO notificationResult error %d\n", notificationValue);
-      continue;                
-    }
-    if (xSemaphoreTake(LocalBNO::loopMutex, pdMS_TO_TICKS(IMU_WAIT_MUTEX))) {
-      if (quaternion.fromBNO(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal)) {
-        quaternion.multiplyFirst(rotateQuatenion);
-        callback(CAN_PLATFORM_QUATERNION, quaternion.serialize());
+
+    while (errorCount < 10) {
+      notificationValue = ulTaskNotifyTakeIndexed(LocalBNO::notificationIndex, pdTRUE, pdMS_TO_TICKS(100));
+
+      auto da = bno.dataAvailable();    
+      if (notificationValue == 0) {
+        errorCount++;      
       }
-            
+      
+      if (!da) {
+        continue;
+      }
+
+      errorCount = 0;      
+      quaternion.fromBNO(bno.rawQuatI, bno.rawQuatJ, bno.rawQuatK, bno.rawQuatReal);
+      quaternion.multiplyFirst(rotateQuatenion);
+      callback(CAN_PLATFORM_QUATERNION, quaternion.serialize());                      
       accelerometer.set(bno.rawAccelX, bno.rawAccelY, bno.rawAccelZ);
       callback(CAN_PLATFORM_ACCELEROMETER, accelerometer.serialize());      
       gyroscope.set(bno.rawGyroX, bno.rawGyroY, bno.rawGyroZ);
       callback(CAN_PLATFORM_GYROSCOPE, gyroscope.serialize());
       accuracy.set(bno.rawQuatRadianAccuracy, bno.getQuatAccuracy(), bno.gyroAccuracy, bno.accelLinAccuracy);
       callback(CAN_PLATFORM_ACCURACY, accuracy.serialize());
-      xSemaphoreGive(LocalBNO::loopMutex);
+
+      if (xSemaphoreTake(LocalBNO::loopMutex, pdMS_TO_TICKS(10))) {
+        data.rawQuaternion = Quaternion(quaternion);
+        data.rawAccelerometer = Accelerometer(accelerometer);
+        data.rawGyroscope = Gyroscope(gyroscope);
+        data.rawAccuracy = Accuracy(accuracy);
+        xSemaphoreGive(LocalBNO::loopMutex);
+      } else {
+        Serial.println("Can't obtain loopMutex semaphore lock");
+      }
 
       if (!needCalibration && bno.quatAccuracy < 3) {
-        needCalibration = true;        
+        needCalibration = true;
         bno.calibrateAll();
         printf("BNO needs calibration. Starting...\n");
       }
@@ -186,28 +133,26 @@ void LocalBNO::loop(void* parameters) {
         needCalibration = false;
       }
     }
+    printf("Error count : %d Try to reinit BNO\n", errorCount);
+    hardReset();
+    vTaskDelay(pdMS_TO_TICKS(300));
   }
+  Serial.println("LocalBNO loop exiting\n");
+  vTaskDelete(NULL);
 }
 
-void LocalBNO::printData() {
-  float roll = (bno.getRoll()) * 180.0 / PI;   // Convert roll to degrees
-  float pitch = (bno.getPitch()) * 180.0 / PI; // Convert pitch to degrees
-  float yaw = (bno.getYaw()) * 180.0 / PI;     // Convert yaw / heading to degrees*/
-  Serial.print("Euler: ");
-  Serial.print(roll, 1);
-  Serial.print(F(","));
-  Serial.print(pitch, 1);
-  Serial.print(F(","));
-  Serial.print(yaw, 1);
-  Serial.println("");
-}
-
-Quaternion LocalBNO::getQuaternion() {  
-  if (xSemaphoreTake(LocalBNO::loopMutex, pdMS_TO_TICKS(IMU_WAIT_MUTEX))) {     
-    lastQuaternion = Quaternion(quaternion);
-    xSemaphoreGive(LocalBNO::loopMutex);
+LocalBNOData LocalBNO::getLocalData() {  
+  if (xSemaphoreTake(loopMutex, pdMS_TO_TICKS(IMU_WAIT_MUTEX))) {       
+    xSemaphoreGive(loopMutex);
   } else {
     Serial.println("Can't obtain loop semaphore lock");
   }
-  return lastQuaternion;
+  return data;
+}
+
+void LocalBNO::hardReset() {
+  digitalWrite(imuRstPin, LOW);
+  vTaskDelay(pdMS_TO_TICKS(10));
+  digitalWrite(imuRstPin, HIGH);
+  vTaskDelay(pdMS_TO_TICKS(100));  
 }

@@ -1,5 +1,4 @@
 #include "arm.h"
-#include "structures.h"
 
 TWAI Arm::twai;
 ArmShoulder Arm::shoulder;
@@ -138,8 +137,6 @@ void Arm::loop(void* parameters) {
 
 void Arm::begin(TwoWire& wire, SPIClass& spi) {
   powerManagement.begin();      
-  //powerManagement.enableCamera();
-  //powerManagement.enableEngines();  
   twai.begin(twaiCallback, twaiErrorCallback);
   platform.begin(wire, spi, detectorsCallback); 
   xTaskCreate(

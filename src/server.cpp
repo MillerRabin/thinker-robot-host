@@ -12,6 +12,5 @@ void serverBegin() {
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, PUT");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type");
   Server.onNotFound(onRequest);
-    
   Server.begin();
 }

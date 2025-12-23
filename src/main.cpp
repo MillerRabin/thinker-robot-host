@@ -55,14 +55,14 @@ void setup(){
   if (!enableWIFI()) {
     Serial.println("Can't enable wifi");
   }
-           
+
+  Wire.begin(I2C_SDA, I2C_SCL, I2C_SPEED);
+  arm.begin(Wire, SPI);
+
   enableVersion();
   enableUpdate();  
   serverBegin();
-  enableEngineHandler();  
-  Wire.begin(I2C_SDA, I2C_SCL, I2C_SPEED);
-  SPI.begin(IMU_SPI_SCK, IMU_SPI_MISO_GPIO, IMU_SPI_MOSI_GPIO, IMU_SPI_CS_GPIO);
-  arm.begin(Wire, SPI);
+  enableEngineHandler();
 }
 
 void loop() {
@@ -70,5 +70,6 @@ void loop() {
     Serial.println("Rebooting...");    
     ESP.restart();
   }
+  cleanupClients();
   vTaskDelay(pdMS_TO_TICKS(2000));
 }

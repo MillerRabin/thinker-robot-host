@@ -1,4 +1,4 @@
-#include "structures.h"
+#include "accuracy.h"
 
 bool Accuracy::set(uint16_t quaternionRadianAccuracy, uint8_t quaternionAccuracy, uint8_t gyroscopeAccuracy, uint8_t accelerometerAccuracy) {
   bool rd = (quaternionRadAccuracy != quaternionRadianAccuracy);

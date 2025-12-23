@@ -3,8 +3,6 @@
 
 #include <Arduino.h>
 
-typedef void (* DetectorsCallback)(uint32_t id, uint64_t data);
-
 class Accuracy {
 public:
   uint16_t quaternionRadAccuracy;

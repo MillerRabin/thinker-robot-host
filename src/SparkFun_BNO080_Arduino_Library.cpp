@@ -103,7 +103,7 @@ boolean BNO080::beginSPI(uint8_t user_CSPin, uint8_t user_WAKPin, uint8_t user_I
 	// Configure the BNO080 for SPI communication
 	digitalWrite(_wake, HIGH); // Before boot up the PS0/WAK pin must be high to enter SPI mode
 	digitalWrite(_rst, LOW);	 // Reset BNO080
-	delay(2);									 // Min length not specified in datasheet?
+	delay(2);		// Min length not specified in datasheet?
 	digitalWrite(_rst, HIGH);	 // Bring out of reset
 
 	// Wait for first assertion of INT before using WAK pin. Can take ~104ms
@@ -1557,14 +1557,12 @@ boolean BNO080::waitForSPI()
 	for (uint8_t counter = 0; counter < 125; counter++) // Don't got more than 255
 	{
 		if (digitalRead(_int) == LOW)
-			return (true);
-		if (_printDebug == true)
-			_debugPort->println(F("SPI Wait"));
+			return (true);		
 		delay(1);
+		//vTaskDelay(pdMS_TO_TICKS(1));
 	}
-
-	if (_printDebug == true)
-		_debugPort->println(F("SPI INT timeout"));
+	
+	printf("SPI INT timeout\n");
 	return (false);
 }
 

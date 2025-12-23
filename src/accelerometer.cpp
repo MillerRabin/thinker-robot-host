@@ -7,12 +7,12 @@ uint64_t Accelerometer::serialize() {
 }
 
 void Accelerometer::deserialize(uint8_t data[8]) {
-  this->x = (uint16_t)data[1] << 8 | data[0];
-  this->y = (uint16_t)data[3] << 8 | data[2];
-  this->z = (uint16_t)data[5] << 8 | data[4];  
+  this->x = (int16_t)data[1] << 8 | data[0];
+  this->y = (int16_t)data[3] << 8 | data[2];
+  this->z = (int16_t)data[5] << 8 | data[4];  
 }
 
-void Accelerometer::set(uint16_t rawAccX, uint16_t rawAccY, uint16_t rawAccZ) {
+void Accelerometer::set(int16_t rawAccX, int16_t rawAccY, int16_t rawAccZ) {
   x = rawAccX;
   y = rawAccY;
   z = rawAccZ;

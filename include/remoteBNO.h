@@ -1,6 +1,6 @@
 #pragma once
 
-#include "structures.h"
+#include "accuracy.h"
 #include "quaternion.h"
 #include "accelerometer.h"
 #include "gyroscope.h"

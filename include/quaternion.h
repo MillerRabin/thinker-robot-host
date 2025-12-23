@@ -29,11 +29,12 @@ class Quaternion {
     float j;
     float k;
     float real;
+    uint8_t Q1 = 14;
+    uint64_t serialize();
     Quaternion(float i = 0, float j = 0, float k = 0, float real = 1.0f)
         : i(i), j(j), k(k), real(real) {}
     Quaternion(IMUQuaternion &q);
-    Quaternion operator*(const IMUQuaternion &q) const
-    {
+    Quaternion operator*(const IMUQuaternion &q) const {
       Quaternion result;
       result.real = real * q.real - i * q.i - j * q.j - k * q.k;
       result.i = real * q.i + i * q.real + j * q.k - k * q.j;
