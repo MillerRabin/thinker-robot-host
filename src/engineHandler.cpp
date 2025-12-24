@@ -46,7 +46,7 @@ void socketLoop(void *parameters)
     response.shoulder.quaternion = squat.serialize();
     response.shoulder.accelerometer = sacc.serialize();
     response.shoulder.gyroscope = sgyro.serialize();
-    response.shoulder.accuracy = sacc.serialize();
+    response.shoulder.accuracy = sa.serialize();
 
     auto equat = Arm::elbow.imu.getQuaternion();
     auto ea = Arm::elbow.imu.accuracy;
@@ -55,7 +55,7 @@ void socketLoop(void *parameters)
     response.elbow.quaternion = equat.serialize();
     response.elbow.accelerometer = eacc.serialize();
     response.elbow.gyroscope = egyro.serialize();
-    response.elbow.accuracy = eacc.serialize();
+    response.elbow.accuracy = ea.serialize();
 
     auto wquat = Arm::wrist.imu.getQuaternion();
     auto wa = Arm::wrist.imu.accuracy;
@@ -64,14 +64,14 @@ void socketLoop(void *parameters)
     response.wrist.quaternion = wquat.serialize();
     response.wrist.accelerometer = wacc.serialize();
     response.wrist.gyroscope = wgyro.serialize();
-    response.wrist.accuracy = wacc.serialize();
+    response.wrist.accuracy = wa.serialize();
 
     auto cquat = Arm::claw.imu.getQuaternion();    
     auto cacc = Arm::claw.imu.accelerometer;
     auto cgyro = Arm::claw.imu.gyroscope;
     response.claw.quaternion = cquat.serialize();
     response.claw.accelerometer = cacc.serialize();
-    response.claw.gyroscope = cgyro.serialize();
+    response.claw.gyroscope = cgyro.serialize();        
     response.claw.range = Arm::claw.range.serialize();
     response.claw.barometer = Arm::claw.barometer.serialize();
 
