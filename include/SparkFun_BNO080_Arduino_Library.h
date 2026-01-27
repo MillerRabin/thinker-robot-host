@@ -115,6 +115,8 @@ const byte CHANNEL_GYRO = 5;
 #define TARE_SET_REORIENTATION 2
 
 #define TARE_AXIS_ALL 0x07
+#define TARE_AXIS_X   0x01
+#define TARE_AXIS_Y 	0x02
 #define TARE_AXIS_Z   0x04
 
 #define TARE_ROTATION_VECTOR 0
@@ -240,6 +242,7 @@ public:
 	boolean calibrationComplete();   //Checks ME Cal response for byte 5, R0 - Status
 
 	void tareNow(bool zAxis=false, uint8_t rotationVectorBasis=TARE_ROTATION_VECTOR);
+	void tare(uint8_t axisMask, uint8_t rotationVectorBasis);
 	void saveTare();
 	void clearTare();
 	

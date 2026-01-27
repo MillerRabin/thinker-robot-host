@@ -8,12 +8,31 @@ DetectorsCallback LocalBNO::callback;
 IMUQuaternion LocalBNO::quaternion;
 LocalBNOData LocalBNO::data;
 
-float rollOffset = 0.0f * (PI / 180.0f);
-float pitchOffset = 0.0f * (PI / 180.0f);
+Quaternion LocalBNO::rotateQuatenion = Quaternion(0.0f, 0.0f, 0.0f, 1.0f);                                  // East North Up
+//Quaternion LocalBNO::rotateQuatenion = Quaternion(0.0f, 0.0f, sqrt(2.0) / 2.0f, sqrt(2.0f) / 2.0f);         // North West Up
+//Quaternion LocalBNO::rotateQuatenion = Quaternion(0.0f, 0.0f, 1.0f, 0.0f);                                  // West South Up
+//Quaternion LocalBNO::rotateQuatenion = Quaternion(0.0f, 0.0f, -sqrt(2.0f) / 2.0f, sqrt(2.0f) / 2.0f);       // South East Up
+//Quaternion LocalBNO::rotateQuatenion = Quaternion(0.0f, -1.0f, 0.0f, 0.0f);                                 // East South Down
+//Quaternion LocalBNO::rotateQuatenion = Quaternion(-sqrt(2.0f) / 2.0f, -sqrt(2.0f) / 2.0f, 0.0f, 0.0f);      // North East Down
+//Quaternion LocalBNO::rotateQuatenion = Quaternion(-1.0f, 0.0f, 0.0f, 0.0f);                                 // West North Down
+//  Quaternion LocalBNO::rotateQuatenion = Quaternion(-sqrt(2.0) / 2.0f, sqrt(2.0) / 2.0f, 0.0f, 0);            // South West Down
+//  Quaternion LocalBNO::rotateQuatenion = Quaternion(0.0f, -sqrt(2.0) / 2.0f, sqrt(2.0) / 2.0f, 0);            // Up South East
+//  Quaternion LocalBNO::rotateQuatenion = Quaternion(-1.0f / 2.0f, -1.0f / 2.0f, 1.0f / 2.0f, 1.0f / 2.0f);    // North Up East
+//  Quaternion LocalBNO::rotateQuatenion = Quaternion(-sqrt(2.0f) / 2.0f, 0.0f, 0.0f, sqrt(2.0f) / 2.0f);       // Down North East
+//  Quaternion LocalBNO::rotateQuatenion = Quaternion(-1.0f / 2.0f, 1.0f / 2.0f, -1.0f / 2.0f, 1.0f / 2.0f);    // South Down East
+//  Quaternion LocalBNO::rotateQuatenion = Quaternion(-sqrt(2.0f) / 2.0f, 0.0f, 0.0f, -sqrt(2.0f) / 2.0);       // Up North West
+//  Quaternion LocalBNO::rotateQuatenion = Quaternion(-1.0f / 2.0f, -1.0f / 2.0f, -1.0f / 2.0f, -1.0f / 2.0f);  // North Down West
+//  Quaternion LocalBNO::rotateQuatenion = Quaternion(0.0f, -sqrt(2.0f) / 2.0f, -sqrt(2.0f) / 2.0f, 0.0f);      // Down South West
+//  Quaternion LocalBNO::rotateQuatenion = Quaternion(1.0f / 2.0f, -1.0f / 2.0f, -1.0f / 2.0f, 1.0f / 2.0f);    // South Up West
+// Quaternion LocalBNO::rotateQuatenion = Quaternion(-1.0f / 2.0f, -1.0f / 2.0f, 1.0f / 2.0f, -1.0f / 2.0f);   // Up East North
+// Quaternion LocalBNO::rotateQuatenion = Quaternion(-sqrt(2.0f) / 2.0f, 0.0f, sqrt(2.0f) / 2.0f, 0.0f);       // West Up North
+// Quaternion LocalBNO::rotateQuatenion = Quaternion(-1.0f / 2.0f, 1.0f / 2.0f, 1.0f / 2.0f, 1.0f / 2.0f);     // Down West North
+// Quaternion LocalBNO::rotateQuatenion = Quaternion(0.0f, -sqrt(2.0f) / 2.0f, 0.0f, -sqrt(2.0f) / 2.0f);      // East Down North
+// Quaternion LocalBNO::rotateQuatenion = Quaternion(1.0f / 2.0f, -1.0f / 2.0f, 1.0f / 2.0f, 1.0f / 2.0f);     // Up West South
+// Quaternion LocalBNO::rotateQuatenion = Quaternion(-sqrt(2.0f) / 2.0f, 0.0f, -sqrt(2.0) / 2.0f, 0.0f);       // West Down South
+// Quaternion LocalBNO::rotateQuatenion = Quaternion(-1.0f / 2.0f, -1.0f / 2.0f, -1.0f / 2.0f, 1.0f / 2.0f);   // Down East South
+// Quaternion LocalBNO::rotateQuatenion = Quaternion(0.0f, -sqrt(2.0f) / 2.0f, 0.0f, sqrt(2.0f) / 2.0f);       // East Up South
 
-Quaternion errorQuat = Quaternion::FromEuler(rollOffset, pitchOffset, 0.0f);
-Quaternion correctionQuat = Quaternion::Conjugate(errorQuat);
-Quaternion LocalBNO::rotateQuatenion = Quaternion::Multiply(correctionQuat, {-0.7071f, 0.7071f, 0.0f, 0.0f});
 
 Accelerometer LocalBNO::accelerometer;
 Gyroscope LocalBNO::gyroscope;
@@ -155,4 +174,8 @@ void LocalBNO::hardReset() {
   vTaskDelay(pdMS_TO_TICKS(10));
   digitalWrite(imuRstPin, HIGH);
   vTaskDelay(pdMS_TO_TICKS(100));  
+}
+
+void LocalBNO::tare(uint8_t axisMask) {
+  bno.tare(axisMask, 0);
 }

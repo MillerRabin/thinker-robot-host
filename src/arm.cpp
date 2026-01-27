@@ -285,6 +285,58 @@ void Arm::set(JsonObject data) {
   }
 }
 
+void Arm::tare(JsonObject data) {  
+  bool platformTare = false;
+  bool hasPlatformTare = getBool(data, "tare-platform", platformTare);
+  bool platformClearTare = false;
+  bool hasPlatformClearTare = getBool(data, "clear-platform", platformClearTare);
+  bool shoulderTare = false;
+  bool hasShoulderTare = getBool(data, "tare-shoulder", shoulderTare);
+  bool shoulderClearTare = false;
+  bool hasShoulderClearTare = getBool(data, "clear-shoulder", shoulderClearTare);
+  bool elbowTare = false;
+  bool hasElbowTare = getBool(data, "tare-elbow", elbowTare);
+  bool elbowClearTare = false;
+  bool hasElbowClearTare = getBool(data, "clear-elbow", elbowClearTare);
+  bool wristTare = false;
+  bool hasWristTare = getBool(data, "tare-wrist", wristTare);
+  bool wristClearTare = false;
+  bool hasWristClearTare = getBool(data, "clear-wrist", wristClearTare);
+  bool clawTare = false;
+  bool hasClawTare = getBool(data, "tare-claw", clawTare);
+  bool clawClearTare = false;
+  bool hasClawClearTare = getBool(data, "clear-claw", clawClearTare);
+
+  uint16_t clearMask = ( platformClearTare ? ARM_PLATFORM : 0 ) |
+                       ( shoulderClearTare ? ARM_SHOULDER : 0 ) |
+                       ( elbowClearTare ? ARM_ELBOW : 0 ) |
+                       ( wristClearTare ? ARM_WRIST : 0 ) |
+                       ( clawClearTare ? ARM_CLAW : 0 );
+
+  uint16_t tareMask = ( platformTare ? ARM_PLATFORM : 0 ) |
+                      ( shoulderTare ? ARM_SHOULDER : 0 ) |
+                      ( elbowTare ? ARM_ELBOW : 0 ) |
+                      ( wristTare ? ARM_WRIST : 0 ) |
+                      ( clawTare ? ARM_CLAW : 0 );
+  
+  ArmDataFrame frame;
+  frame.values.param1 = clearMask;
+  frame.values.param2 = tareMask;
+  frame.values.param3 = 0;
+  frame.values.param4 = 0;
+  
+  if (platformClearTare) {
+    platform.imu.clearTare();
+  }
+  
+  if (platformTare) {    
+    platform.imu.tare(TARE_AXIS_ALL);
+    platform.imu.saveTare();
+  }
+
+  twai.sendData(CAN_TARE, frame.bytes);
+}
+
 void Arm::setRotate(JsonObject data) {
   float shoulderReal = 0;
   getFloat(data, "shoulder-real", shoulderReal);

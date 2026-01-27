@@ -68,4 +68,5 @@ class Arm {
     static void set(JsonObject data);
     static void setRotate(JsonObject data);
     static StatusResponse upgrade(JsonObject data);
-    };
+    static void tare(JsonObject data);
+  };

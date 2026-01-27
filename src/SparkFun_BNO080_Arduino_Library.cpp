@@ -1361,6 +1361,10 @@ void BNO080::tareNow(bool zAxis, uint8_t rotationVectorBasis)
 	sendTareCommand(TARE_NOW, zAxis ? TARE_AXIS_Z : TARE_AXIS_ALL, rotationVectorBasis);
 }
 
+void BNO080::tare(uint8_t axisMask, uint8_t rotationVectorBasis) {
+	sendTareCommand(TARE_NOW, axisMask, rotationVectorBasis);
+}
+
 void BNO080::saveTare()
 {
 	sendTareCommand(TARE_PERSIST);

@@ -98,9 +98,26 @@ void enableEngineHandler() {
     sendStatus(request, status); 
   });
 
+  Server.on("/tare", HTTP_OPTIONS, [](AsyncWebServerRequest *request)
+    { request->send(200); 
+  });
+
+  AsyncCallbackJsonWebHandler *tareHandler = new AsyncCallbackJsonWebHandler("/tare", [](AsyncWebServerRequest *request, JsonVariant json) {    
+    if (!json.is<JsonObject>()) {
+      request->send(400, "application/json", "{\"error\":\"Invalid JSON object\"}");
+      return;
+    }
+    
+    JsonObject jsonObj = json.as<JsonObject>();    
+    Arm::tare(jsonObj);
+    auto status = StatusResponse({"Set Success", RESPONSE_STATUS_SUCCESS});
+    sendStatus(request, status); 
+  });
+
   Server.on("/setRotate", HTTP_OPTIONS, [](AsyncWebServerRequest *request)
             { request->send(200); 
   });
+
 
   AsyncCallbackJsonWebHandler *rotationHandler = new AsyncCallbackJsonWebHandler("/setRotate", [](AsyncWebServerRequest *request, JsonVariant json)
                                                                                  {
@@ -131,6 +148,7 @@ void enableEngineHandler() {
   });
 
   Server.addHandler(engineHandler);
+  Server.addHandler(tareHandler);
   Server.addHandler(rotationHandler);
   Server.addHandler(upgradeHandler);  
   Server.addHandler(&WebSocket);

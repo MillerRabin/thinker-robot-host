@@ -45,4 +45,11 @@ class LocalBNO {
     static Accelerometer accelerometer;
     static Gyroscope gyroscope;
     static Accuracy accuracy;
+    static void tare(uint8_t axisMask);
+    static void saveTare() {
+      bno.saveTare();
+    }
+    static void clearTare() {
+      bno.clearTare();
+    }
 };
