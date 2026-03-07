@@ -24,32 +24,33 @@ class LocalBNOData {
 
 class LocalBNO {
   private:
-    static BNO080 bno;
-    static unsigned int imuIntPin;
-    static unsigned int imuRstPin;
+    BNO080 bno;
+    const unsigned int imuIntPin;
+    const unsigned int imuRstPin;
     static void IRAM_ATTR interruptHandler();
     static TaskHandle_t taskHandle;
     static const uint32_t notificationIndex;    
-    static void loop(void* parameters);
-    static DetectorsCallback callback;
+    static void loop(void* instance);
+    DetectorsCallback callback;
     static SemaphoreHandle_t loopMutex;
-    static bool initBNO(); 
-    static SPIClass* spi;
-    static void hardReset();
-    static LocalBNOData data;
+    bool initBNO(); 
+    SPIClass* spi;
+    void hardReset();
+    LocalBNOData data;
   public:    
-    static void begin(SPIClass& spi, DetectorsCallback callback);
-    static Quaternion rotateQuatenion;
-    static IMUQuaternion quaternion;
+    void begin(SPIClass& spi, DetectorsCallback callback);
+    Quaternion rotateQuatenion = Quaternion(0.0f, 0.0f, 0.0f, 1.0f); // East North Up;
+    Quaternion quaternion;
     LocalBNOData getLocalData();
-    static Accelerometer accelerometer;
-    static Gyroscope gyroscope;
-    static Accuracy accuracy;
-    static void tare(uint8_t axisMask);
-    static void saveTare() {
+    Accelerometer accelerometer;
+    Gyroscope gyroscope;
+    Accuracy accuracy;
+    void tare(uint8_t axisMask);
+    void saveTare() {
       bno.saveTare();
     }
-    static void clearTare() {
+    void clearTare() {
       bno.clearTare();
     }
+    LocalBNO(const unsigned int imuIntPin, const unsigned int imuRstPin) : imuIntPin(imuIntPin), imuRstPin(imuRstPin) {};
 };

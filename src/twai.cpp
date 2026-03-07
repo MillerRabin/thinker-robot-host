@@ -19,7 +19,7 @@ bool TWAI::sendData(uint32_t id, uint8_t* data) {
   obdFrame.extd = 0;
   memcpy(obdFrame.data, data, 8);
   if (xSemaphoreTake(TWAI::sendSemaphore, pdMS_TO_TICKS(CAN_SEND_WAIT_SEMAPHORE)) != pdTRUE) {
-    Serial.println("Can't obtain sendSemaphore in sendTask");
+    //Serial.println("Can't obtain sendSemaphore for SendData");
     return false;
   };
   canSendMap[id] = obdFrame;

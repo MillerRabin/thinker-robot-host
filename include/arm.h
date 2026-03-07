@@ -63,8 +63,8 @@ class Arm {
     static ArmElbow elbow;
     static ArmWrist wrist;
     static ArmClaw claw;
-    static PowerManagement powerManagement;
-    static void begin(TwoWire &wire, SPIClass &spi);
+    static PowerManagement powerManagement;    
+    static void begin(TwoWire &wire);
     static void set(JsonObject data);
     static void setRotate(JsonObject data);
     static StatusResponse upgrade(JsonObject data);

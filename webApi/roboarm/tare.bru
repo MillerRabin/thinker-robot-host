@@ -5,14 +5,14 @@ meta {
 }
 
 post {
-  url: http://192.168.1.120/set
+  url: http://192.168.1.120/tare
   body: json
   auth: none
 }
 
 body:json {
-  {        
-      "elbow-y": 90,    
-      "enginesEnabled": false
+  {
+    "tare-platform": true,
+    "tare-shoulder": true
   }
 }

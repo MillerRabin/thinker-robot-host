@@ -11,7 +11,10 @@ class Gyroscope : public QBase {
     int16_t Q1 = 9;
     uint64_t serialize();
     void deserialize(uint8_t data[8]);
-    void set(uint16_t rawX, uint16_t rawY, uint16_t rawZ);
+    void set(float x, float y, float z);
+    void fromWitmotion(int16_t rawGyroX, int16_t rawGyroY, int16_t rawGyroZ);
+    void fromBNO(int16_t rawGyroX, int16_t rawGyroY, int16_t rawGyroZ);
+    
     float witMotionX() { return x / 32768.0f * 2000.0f; };
     float witMotionY() { return y / 32768.0f * 2000.0f; };
     float witMotionZ() { return z / 32768.0f * 2000.0f; };

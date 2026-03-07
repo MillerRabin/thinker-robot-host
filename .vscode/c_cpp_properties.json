@@ -10,6 +10,8 @@
             "includePath": [
                 "/home/millerrabin/projects/millerrabin/thinker-robot-host/include",
                 "/home/millerrabin/projects/millerrabin/thinker-robot-host/src",
+                "/home/millerrabin/projects/millerrabin/thinker-robot-host/lib/witmotion",
+                "/home/millerrabin/projects/millerrabin/thinker-robot-host/lib/INA3221/src",
                 "/home/millerrabin/.platformio/packages/framework-arduinoespressif32/libraries/Update/src",
                 "/home/millerrabin/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src",
                 "/home/millerrabin/projects/millerrabin/thinker-robot-host/.pio/libdeps/esp32doit-devkit-v1/ESPAsyncWebServer/src",
@@ -246,6 +248,8 @@
                 "path": [
                     "/home/millerrabin/projects/millerrabin/thinker-robot-host/include",
                     "/home/millerrabin/projects/millerrabin/thinker-robot-host/src",
+                    "/home/millerrabin/projects/millerrabin/thinker-robot-host/lib/witmotion",
+                    "/home/millerrabin/projects/millerrabin/thinker-robot-host/lib/INA3221/src",
                     "/home/millerrabin/.platformio/packages/framework-arduinoespressif32/libraries/Update/src",
                     "/home/millerrabin/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src",
                     "/home/millerrabin/projects/millerrabin/thinker-robot-host/.pio/libdeps/esp32doit-devkit-v1/ESPAsyncWebServer/src",
@@ -479,7 +483,7 @@
                 ]
             },
             "defines": [
-                "PLATFORMIO=60118",
+                "PLATFORMIO=60119",
                 "ARDUINO_ESP32_DEV",
                 "HAVE_CONFIG_H",
                 "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\"",

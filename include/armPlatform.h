@@ -1,12 +1,17 @@
 #include <Wire.h>
-
-#include "localBNO.h"
+#include "config.h"
+#include "localWitmotion.h"
 #include "twai.h"
-#include "pms5611.h"
+#include "localINA3221.h"
 
 class ArmPlatform {  
+  private:
+    DetectorsCallback callback;
   public:
-    static LocalBNO imu;
-    static PMS5611 ms;    
-    static void begin(TwoWire& wire, SPIClass& spi, DetectorsCallback callback); 
+    LocalWitmotion imu;
+    LocalINA3221 ina;
+    void begin(TwoWire &wire);
+    ArmPlatform(DetectorsCallback callback) : callback(callback), 
+                                              imu(Serial2,IMU_RX_GPIO, IMU_TX_GPIO, callback),
+                                              ina() {};
 };

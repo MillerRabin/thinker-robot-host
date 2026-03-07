@@ -15,8 +15,7 @@ void sendStatus(AsyncWebServerRequest *request, const StatusResponse &response) 
 void socketLoop(void *parameters)
 {  
   while (true) {
-    ClientSocketResponse response;
-
+    ClientSocketResponse response;    
     response.status = (uint64_t)Arm::status.canSendOK |
                       (uint64_t)Arm::status.shoulderQuaternionOK << 1 |
                       (uint64_t)Arm::status.elbowQuaternionOK << 2 |
@@ -27,22 +26,24 @@ void socketLoop(void *parameters)
                       (uint64_t)Arm::powerManagement.getCameraStatus() << 7;
 
     auto pdata = Arm::platform.imu.getLocalData();
-    auto pquat = pdata.getQuaternion();
-    auto pacc = pdata.getAccuracy();
+    auto pquat = pdata.getQuaternion();    
     auto pa = pdata.getAccelerometer();
     auto pgyro = pdata.getGyroscope();
-    auto pmsData = Arm::platform.ms.getLocalData();
-    auto pbar = pmsData.getBarometer();    
+    auto pbar = pdata.getBarometer();
+    auto power = Arm::platform.ina.getLocalData();
+    
     response.platform.quaternion = pquat.serialize();
     response.platform.accelerometer = pa.serialize();
-    response.platform.gyroscope = pgyro.serialize();
-    response.platform.accuracy = pacc.serialize();
+    response.platform.gyroscope = pgyro.serialize();    
     response.platform.barometer = pbar.serialize();
+    response.platform.cpuPower = power.serializeCPULine();
+    response.platform.enginesPower = power.serializeEnginesLine();
 
     auto squat = Arm::shoulder.imu.getQuaternion();
     auto sa = Arm::shoulder.imu.accuracy;
     auto sacc = Arm::shoulder.imu.accelerometer;
     auto sgyro = Arm::shoulder.imu.gyroscope;
+
     response.shoulder.quaternion = squat.serialize();
     response.shoulder.accelerometer = sacc.serialize();
     response.shoulder.gyroscope = sgyro.serialize();
@@ -52,6 +53,7 @@ void socketLoop(void *parameters)
     auto ea = Arm::elbow.imu.accuracy;
     auto eacc = Arm::elbow.imu.accelerometer;
     auto egyro = Arm::elbow.imu.gyroscope;
+
     response.elbow.quaternion = equat.serialize();
     response.elbow.accelerometer = eacc.serialize();
     response.elbow.gyroscope = egyro.serialize();
@@ -61,6 +63,7 @@ void socketLoop(void *parameters)
     auto wa = Arm::wrist.imu.accuracy;
     auto wacc = Arm::wrist.imu.accelerometer;
     auto wgyro = Arm::wrist.imu.gyroscope;
+
     response.wrist.quaternion = wquat.serialize();
     response.wrist.accelerometer = wacc.serialize();
     response.wrist.gyroscope = wgyro.serialize();
@@ -69,6 +72,7 @@ void socketLoop(void *parameters)
     auto cquat = Arm::claw.imu.getQuaternion();    
     auto cacc = Arm::claw.imu.accelerometer;
     auto cgyro = Arm::claw.imu.gyroscope;
+
     response.claw.quaternion = cquat.serialize();
     response.claw.accelerometer = cacc.serialize();
     response.claw.gyroscope = cgyro.serialize();        

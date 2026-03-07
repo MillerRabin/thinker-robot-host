@@ -10,14 +10,17 @@
 #include "accuracy.h"
 
 struct __attribute__((packed)) PlatformSocketResponse {  
+  uint8_t tag = SOCKET_PLATFORM_TAG;
   uint64_t quaternion;
   uint64_t accelerometer;
-  uint64_t gyroscope;
-  uint64_t accuracy;
+  uint64_t gyroscope;  
   uint64_t barometer;
+  uint64_t cpuPower;
+  uint64_t enginesPower;
 };
 
 struct __attribute__((packed)) ShoulderSocketResponse {  
+  uint8_t tag = SOCKET_SHOULDER_TAG;
   uint64_t quaternion;
   uint64_t accelerometer;
   uint64_t gyroscope;
@@ -25,6 +28,7 @@ struct __attribute__((packed)) ShoulderSocketResponse {
 };
 
 struct __attribute__((packed)) ElbowSocketResponse {
+  uint8_t tag = SOCKET_ELBOW_TAG;
   uint64_t quaternion;
   uint64_t accelerometer;
   uint64_t gyroscope;
@@ -32,6 +36,7 @@ struct __attribute__((packed)) ElbowSocketResponse {
 };
 
 struct __attribute__((packed)) WristSocketResponse {
+  uint8_t tag = SOCKET_WRIST_TAG;
   uint64_t quaternion;
   uint64_t accelerometer;
   uint64_t gyroscope;
@@ -39,6 +44,7 @@ struct __attribute__((packed)) WristSocketResponse {
 };
 
 struct __attribute__((packed)) ClawSocketResponse {
+  uint8_t tag = SOCKET_CLAW_TAG;
   uint64_t quaternion;
   uint64_t accelerometer;
   uint64_t gyroscope;
@@ -47,6 +53,7 @@ struct __attribute__((packed)) ClawSocketResponse {
 };
 
 struct __attribute__((packed)) ClientSocketResponse {
+  uint8_t tag = SOCKET_RESPONSE_TAG;
   uint64_t status;
   PlatformSocketResponse platform;
   ShoulderSocketResponse shoulder;

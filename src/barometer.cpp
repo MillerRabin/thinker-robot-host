@@ -1,7 +1,8 @@
 #include "barometer.h"
 
 uint64_t Barometer::serialize() {
-  return (uint64_t)temperatureRaw << 32 | (uint64_t)heightRaw;
+  return ((uint64_t)(uint32_t)temperatureRaw << 32) |
+          (uint64_t)(uint32_t)heightRaw;
 }
 
 void Barometer::deserialize(uint8_t data[8])
@@ -12,5 +13,5 @@ void Barometer::deserialize(uint8_t data[8])
 
 void Barometer::set(int32_t height, uint16_t temperature) {  
   this->temperatureRaw = temperature; 
-  this->heightRaw = height;
+  this->heightRaw = height;  
 }

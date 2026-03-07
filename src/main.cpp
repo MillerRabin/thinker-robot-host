@@ -52,12 +52,13 @@ void enableVersion() {
 
 void setup(){
   Serial.begin(115200);  
+  Serial2.begin(9600, IMU_RX_GPIO, IMU_TX_GPIO);
   if (!enableWIFI()) {
     Serial.println("Can't enable wifi");
   }
 
   Wire.begin(I2C_SDA, I2C_SCL, I2C_SPEED);
-  arm.begin(Wire, SPI);
+  arm.begin(Wire);
 
   enableVersion();
   enableUpdate();  

@@ -4,7 +4,7 @@
 #include "Arduino.h"
 #include "Wire.h"
 
-void i2c_scan(TwoWire *wire);
+void i2c_scan(TwoWire& wire);
 
 
 

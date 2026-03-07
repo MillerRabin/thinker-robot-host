@@ -5,15 +5,22 @@
 #define TWAI_RX_GPIO 26
 #define ENGINE_POWER_GPIO 14
 #define CAMERA_POWER_GPIO 13
+#define DETECTORS_DISABLE_GPIO 18
+#define PERIPHERAL_CPU_ENABLE_GPIO 15
 
-#define IMU_INT_GPIO 17
+// BNO085 Configuration
+#define IMU_INT_GPIO 34
 #define IMU_SPI_CS_GPIO 15
 #define IMU_WAKE_GPIO 33
-#define IMU_RST_GPIO 16
+#define IMU_RST_GPIO 25
 #define IMU_SPI_SCK 18
 #define IMU_SPI_MISO_GPIO 19
 #define IMU_SPI_MOSI_GPIO 23
 #define IMU_SPI_SPEED 3000000U
+
+// WT901B Configuration
+#define IMU_RX_GPIO 16
+#define IMU_TX_GPIO 17
 
 #define I2C_SDA 21
 #define I2C_SCL 22
@@ -92,3 +99,10 @@
 #define ARM_ELBOW     4
 #define ARM_WRIST     8
 #define ARM_CLAW      16 
+
+#define SOCKET_RESPONSE_TAG 0x01
+#define SOCKET_PLATFORM_TAG 0x02
+#define SOCKET_SHOULDER_TAG 0x03
+#define SOCKET_ELBOW_TAG 0x04
+#define SOCKET_WRIST_TAG 0x05
+#define SOCKET_CLAW_TAG 0x06

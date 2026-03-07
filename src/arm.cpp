@@ -4,7 +4,7 @@ TWAI Arm::twai;
 ArmShoulder Arm::shoulder;
 ArmElbow Arm::elbow;
 ArmWrist Arm::wrist;
-ArmPlatform Arm::platform;
+ArmPlatform Arm::platform(detectorsCallback);
 ArmStatus Arm::status;
 
 PowerManagement Arm::powerManagement;
@@ -114,13 +114,13 @@ void Arm::twaiErrorCallback(CanFrame frame, int code) {
     Arm::status.canSendOK = true;
   } else {
     Arm::status.canSendOK = false;    
-    printf("frame send error %d\n", frame.identifier);
+    //printf("frame send error %d\n", frame.identifier);
   }  
 }
 
 void Arm::detectorsCallback(uint32_t id, uint64_t data) {
   if (!twai.sendData(id, (uint8_t*)&data)) {
-    printf("Error sending detectors data\n");
+    //printf("Error sending detectors data\n");
   }
 }
 
@@ -135,10 +135,10 @@ void Arm::loop(void* parameters) {
   }
 }
 
-void Arm::begin(TwoWire& wire, SPIClass& spi) {
+void Arm::begin(TwoWire& wire) {
   powerManagement.begin();      
   twai.begin(twaiCallback, twaiErrorCallback);
-  platform.begin(wire, spi, detectorsCallback); 
+  platform.begin(wire);
   xTaskCreate(
     loop,
     "Arm::loop",
@@ -325,14 +325,14 @@ void Arm::tare(JsonObject data) {
   frame.values.param3 = 0;
   frame.values.param4 = 0;
   
-  if (platformClearTare) {
+  /*if (platformClearTare) {
     platform.imu.clearTare();
   }
   
   if (platformTare) {    
     platform.imu.tare(TARE_AXIS_ALL);
     platform.imu.saveTare();
-  }
+  }*/
 
   twai.sendData(CAN_TARE, frame.bytes);
 }
