@@ -1,6 +1,6 @@
 #include "arm.h"
 
-TWAI Arm::twai;
+TWAI Arm::twai((gpio_num_t)TWAI_RX_GPIO, (gpio_num_t)TWAI_TX_GPIO, Arm::twaiCallback, Arm::twaiErrorCallback);
 ArmShoulder Arm::shoulder;
 ArmElbow Arm::elbow;
 ArmWrist Arm::wrist;
@@ -114,14 +114,12 @@ void Arm::twaiErrorCallback(CanFrame frame, int code) {
     Arm::status.canSendOK = true;
   } else {
     Arm::status.canSendOK = false;    
-    //printf("frame send error %d\n", frame.identifier);
+    printf("frame send error %d, code %d\n", frame.identifier, code);
   }  
 }
 
 void Arm::detectorsCallback(uint32_t id, uint64_t data) {
-  if (!twai.sendData(id, (uint8_t*)&data)) {
-    //printf("Error sending detectors data\n");
-  }
+  twai.sendData(id, (uint8_t*)&data);  
 }
 
 void Arm::loop(void* parameters) {
@@ -137,7 +135,7 @@ void Arm::loop(void* parameters) {
 
 void Arm::begin(TwoWire& wire) {
   powerManagement.begin();      
-  twai.begin(twaiCallback, twaiErrorCallback);
+  twai.begin(TWAI_SPEED_1000KBPS);
   platform.begin(wire);
   xTaskCreate(
     loop,
@@ -222,13 +220,7 @@ void Arm::setPowerState(JsonObject data) {
   bool hasCPUPowerEnabled = getBool(data, "cpuPowerEnabled", cpuPowerEnabled);
   bool detectorsPowerDisabled = false;
   bool hasDetecorsPowerDisabled = getBool(data, "detectorsPowerDisabled", detectorsPowerDisabled);
-  
-printf("Power state change: engines %s, camera %s, cpu power %s, detectors power %s\n",
-       hasEngines ? (enginesEnabled ? "enabled" : "disabled") : "unchanged",
-       hasCamera ? (cameraEnabled ? "enabled" : "disabled") : "unchanged",
-       hasCPUPowerEnabled ? (cpuPowerEnabled ? "enabled" : "disabled") : "unchanged",
-       hasDetecorsPowerDisabled ? (detectorsPowerDisabled ? "disabled" : "enabled") : "unchanged");
-  
+    
   if (hasEngines)
     enginesEnabled ? powerManagement.enableEngines() : powerManagement.disableEngines();
 

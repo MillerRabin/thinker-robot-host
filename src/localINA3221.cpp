@@ -44,7 +44,7 @@ LocalINAData LocalINA3221::getLocalData() {
     localData = data;
     xSemaphoreGive(LocalINA3221::loopMutex);
   } else {
-    Serial.println("INA3221 Can't obtain loopMutex semaphore lock");
+    //printf("INA3221 Can't obtain loopMutex semaphore lock");
   }
   return localData;
 }

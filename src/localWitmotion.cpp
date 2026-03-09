@@ -23,7 +23,7 @@ void LocalWitmotion::readDetectorTask(void *instance) {
   while (true) {
     wit->readData();
     if (!wit->isPresent()) {
-      printf("Sensor lost\n");
+      printf("Sensor lost\n");      
       vTaskResume(wit->initTaskHandle);
       vTaskSuspend(NULL);
     }

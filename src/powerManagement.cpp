@@ -19,7 +19,7 @@ bool PowerManagement::begin() {
   disableCamera();
   disableEngines();
   enableDetectors();
-  disableCPUPower();
+  enableCPUPower();
   return true;
 }
 
