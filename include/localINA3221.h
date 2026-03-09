@@ -28,6 +28,5 @@ private:
   static LocalINAData data;
 public:  
   LocalINAData getLocalData();
-  void readAll();
-  void begin(TwoWire &wire, DetectorsCallback callback);
+  bool begin(TwoWire &wire, DetectorsCallback callback);
 };

@@ -23,7 +23,9 @@ void socketLoop(void *parameters)
                       (uint64_t)Arm::status.clawQuaternionOK << 4 |
                       (uint64_t)Arm::status.clawRangeOK << 5 |
                       (uint64_t)Arm::powerManagement.getEnginesStatus() << 6 |
-                      (uint64_t)Arm::powerManagement.getCameraStatus() << 7;
+                      (uint64_t)Arm::powerManagement.getCameraStatus() << 7 |
+                      (uint64_t)Arm::powerManagement.getDetectorsStatus() << 8 |
+                      (uint64_t)Arm::powerManagement.getCPUPowerStatus() << 9;
 
     auto pdata = Arm::platform.imu.getLocalData();
     auto pquat = pdata.getQuaternion();    

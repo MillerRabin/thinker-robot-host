@@ -218,11 +218,30 @@ void Arm::setPowerState(JsonObject data) {
   bool hasEngines = getBool(data, "enginesEnabled", enginesEnabled);
   bool cameraEnabled = false;
   bool hasCamera = getBool(data, "cameraEnabled", cameraEnabled);
+  bool cpuPowerEnabled = false;
+  bool hasCPUPowerEnabled = getBool(data, "cpuPowerEnabled", cpuPowerEnabled);
+  bool detectorsPowerDisabled = false;
+  bool hasDetecorsPowerDisabled = getBool(data, "detectorsPowerDisabled", detectorsPowerDisabled);
+  
+printf("Power state change: engines %s, camera %s, cpu power %s, detectors power %s\n",
+       hasEngines ? (enginesEnabled ? "enabled" : "disabled") : "unchanged",
+       hasCamera ? (cameraEnabled ? "enabled" : "disabled") : "unchanged",
+       hasCPUPowerEnabled ? (cpuPowerEnabled ? "enabled" : "disabled") : "unchanged",
+       hasDetecorsPowerDisabled ? (detectorsPowerDisabled ? "disabled" : "enabled") : "unchanged");
+  
   if (hasEngines)
     enginesEnabled ? powerManagement.enableEngines() : powerManagement.disableEngines();
 
   if (hasCamera)
     cameraEnabled ? powerManagement.enableCamera() : powerManagement.disableCamera();
+
+  if (hasCPUPowerEnabled)
+    cpuPowerEnabled ? powerManagement.enableCPUPower() : powerManagement.disableCPUPower();
+
+  if (hasDetecorsPowerDisabled)    
+    detectorsPowerDisabled ? powerManagement.disableDetectors() : powerManagement.enableDetectors();
+  
+  
 }
 bool Arm::sendArmData(
     JsonObject data,

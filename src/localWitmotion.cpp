@@ -3,7 +3,6 @@
 uint32_t LocalWitmotion::c_uiBaud[8] = { 230400, 115200, 57600, 38400, 19200, 9600 };
 volatile bool LocalWitmotion::dataAvailable = false;
 LocalWitmotion *LocalWitmotion::instance = NULL;
-TaskHandle_t LocalWitmotion::readDetectorTaskHandle;
 SemaphoreHandle_t LocalWitmotion::loopMutex;
 
 void LocalWitmotion::SensorUartSend(uint8_t *p_data, uint32_t uiSize) {
@@ -11,24 +10,25 @@ void LocalWitmotion::SensorUartSend(uint8_t *p_data, uint32_t uiSize) {
 }
 
 void LocalWitmotion::readData() { 
-  uint8_t buffer[128];  
-  size_t len = port.readBytes(buffer, sizeof(buffer));
-  if (len > 0) {
-    for (size_t i = 0; i < len; i++) {
-      WitSerialDataIn(buffer[i]);
-    }
-  }
+  while (port.available()) {
+    uint8_t c = port.read();
+    WitSerialDataIn(c);
+    lastReceiveTime = millis();
+  }  
 }
 
-void LocalWitmotion::readDetectorTask(void* instance) {
-  LocalWitmotion *wit = (LocalWitmotion *)instance;  
-  while (true) {      
-    while (wit->port.available()) {
-      uint8_t c = wit->port.read();
-        WitSerialDataIn(c);
-      }
-      vTaskDelay(1);
+void LocalWitmotion::readDetectorTask(void *instance) {
+  printf("Witmotion Sensor read task started\n");
+  LocalWitmotion *wit = (LocalWitmotion *)instance;
+  while (true) {
+    wit->readData();
+    if (!wit->isPresent()) {
+      printf("Sensor lost\n");
+      vTaskResume(wit->initTaskHandle);
+      vTaskSuspend(NULL);
     }
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
 }
 
 void LocalWitmotion::setContent() {
@@ -37,23 +37,6 @@ void LocalWitmotion::setContent() {
   } else {
     printf("Set content Mode Success\n");
   }  
-}
-
-void LocalWitmotion::initNorthAndSwitchTo6Axis() {
-  printf("Step 1: Switching to 9-axis mode\n");
-  set9AxisMode();
-  printf("Place device still... capturing north\n");  
-  Delayms(3000);
-  
-  /*LocalWitmotionData data = getLocalData();
-  this->northReference = data.rawQuaternion;*/
-
-  printf("North captured\n");
-
-  printf("Step 2: Switching to 6-axis mode\n");
-
-  set6AxisMode();    
-  printf("6-axis mode enabled\n");
 }
 
 void LocalWitmotion::set6AxisMode() {
@@ -94,32 +77,23 @@ void LocalWitmotion::setBandwidth() {
   }
 }
 
-void LocalWitmotion::init(void *instance) {  
+void LocalWitmotion::init(void *instance) {
   printf("Witmotion Sensor scan started\n");
   LocalWitmotion *wit = (LocalWitmotion *)instance;
 
-  uint32_t scanResult = wit->autoScanSensor();
-  if (scanResult == 0) {
-    printf("No sensor found\n");
-    vTaskDelete(NULL);
-    return;
+  while (true) {
+    uint32_t scanResult = wit->autoScanSensor();
+    if (scanResult != 0) {
+      printf("Sensor found at baud rate: %lu\n", scanResult);
+      wit->setBandwidth();
+      wit->setRefreshRate();
+      wit->set9AxisMode();
+      wit->setContent();
+      vTaskResume(wit->readDetectorTaskHandle);
+      vTaskSuspend(NULL);
+    }
+    vTaskDelay(pdMS_TO_TICKS(1000));
   }
-
-  printf("Sensor found at baud rate: %lu\n", scanResult);
-  
-  wit->setBandwidth();
-  wit->setRefreshRate();  
-  wit->set9AxisMode();
-  //wit->initNorthAndSwitchTo6Axis();
-  wit->setContent();
-  
-  BaseType_t readTaskStatus =
-        xTaskCreate(readDetectorTask, "LocalWitmotion::readDetectorTask", 4096,
-                    wit, 5, &readDetectorTaskHandle);
-  
-  //wit->calibrate();
-        
-  vTaskDelete(NULL);
 }
 
 void LocalWitmotion::setBaudRate() {
@@ -206,11 +180,20 @@ uint32_t LocalWitmotion::autoScanSensor() {
   }
   return 0;
 }
-void LocalWitmotion::begin() {
-  BaseType_t initTaskStatus =
-      xTaskCreate(init, "LocalWitmotion::init", 4096, this, 5, NULL);
-}
 
+bool LocalWitmotion::begin() {
+  BaseType_t initTaskStatus = xTaskCreate(readDetectorTask, "readDetectorTask", 4096, this, 5, &readDetectorTaskHandle);
+  if (initTaskStatus != pdPASS) {
+    printf("Failed to create readDetectorTask\n");
+    return false;
+  }
+  xTaskCreate(init, "initTask", 4096, this, 5, &initTaskHandle);
+  if (initTaskStatus != pdPASS) {
+    printf("Failed to create initTask\n");
+    return false;
+  }
+  return true;
+}
 
 LocalWitmotion::LocalWitmotion(HardwareSerial& port, 
                                const uint memsRxPin, const uint memsTxPin,
@@ -223,19 +206,9 @@ LocalWitmotion::LocalWitmotion(HardwareSerial& port,
   LocalWitmotion::instance = this;  
   LocalWitmotion::loopMutex = xSemaphoreCreateMutex();  
   WitInit(WIT_PROTOCOL_NORMAL, 0xFF);  
-  WitSerialWriteRegister(SensorUartSend);
-  printf("Serial registered\n");
-  WitRegisterCallBack(SensorDataUpdata);
-  printf("Register Callback\n");
+  WitSerialWriteRegister(SensorUartSend);  
+  WitRegisterCallBack(SensorDataUpdata);  
   WitDelayMsRegister(Delayms);  
-}
-
-void LocalWitmotion::tare() {
-  WitWriteReg(CALSW, 0x03);
-  Delayms(200);
-  WitWriteReg(CALSW, 0x00);
-  /*WitWriteReg(SAVE, 0x00);
-  Delayms(200);*/
 }
 
 LocalWitmotionData LocalWitmotion::getLocalData() {

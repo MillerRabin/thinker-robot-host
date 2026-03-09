@@ -3,5 +3,7 @@
 
 void ArmPlatform::begin(TwoWire& wire) {  
   imu.begin();
-  ina.begin(wire, callback);  
+  if (!ina.begin(wire, callback)) {
+    printf("INA3221 is not initialized.\n");
+  }
 }

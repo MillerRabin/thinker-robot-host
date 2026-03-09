@@ -28,7 +28,9 @@ public:
 class LocalWitmotion {
 private:  
   const uint memsRxPin;
-  const uint memsTxPin;  
+  const uint memsTxPin;
+  uint32_t lastReceiveTime = 0;
+  uint32_t receiveTimeout = 1000;
   static LocalWitmotion* instance;
   static void SensorUartSend(uint8_t *p_data, uint32_t uiSize);
   static void SensorDataUpdata(uint32_t uiReg, uint32_t uiRegNum);
@@ -39,8 +41,7 @@ private:
   uint32_t autoScanSensor(void);
   static volatile bool dataAvailable;
   static uint32_t c_uiBaud[8];  
-  void setBaudRate();  
-  static TaskHandle_t readDetectorTaskHandle;
+  void setBaudRate();    
   static SemaphoreHandle_t loopMutex;
   LocalWitmotionData data;
   LocalWitmotionData prevData;
@@ -50,15 +51,16 @@ public:
   Gyroscope gyroscope;
   Quaternion quaternion;
   Barometer barometer;
+  TaskHandle_t initTaskHandle;
+  TaskHandle_t readDetectorTaskHandle;
   const DetectorsCallback callback;
   LocalWitmotionData getLocalData();
-  void begin();
+  bool begin();
   void set6AxisMode();
-  void set9AxisMode();
-  void initNorthAndSwitchTo6Axis();
+  void set9AxisMode();  
   void setRefreshRate();
   void setBandwidth();
   void setContent();
-  LocalWitmotion(HardwareSerial& port, const uint memsRXPin, const uint memsTxPin, DetectorsCallback callback);
-  static void tare();
+  bool isPresent() { return (millis() - lastReceiveTime) < receiveTimeout; }
+  LocalWitmotion(HardwareSerial& port, const uint memsRXPin, const uint memsTxPin, DetectorsCallback callback);    
 };
