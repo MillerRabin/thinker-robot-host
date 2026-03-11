@@ -6,210 +6,158 @@ bool TWAI::sendData(uint32_t id, uint8_t *data) {
   obdFrame.data_length_code = 8;
   obdFrame.extd = 0;
   memcpy(obdFrame.data, data, 8);
-  if (sendSemaphore == NULL) {    
-    return false;
-  }
-
-  if (xSemaphoreTake(sendSemaphore,
-                     pdMS_TO_TICKS(CAN_SEND_WAIT_SEMAPHORE)) != pdTRUE) {
-    // Serial.println("Can't obtain sendSemaphore for SendData");
-    return false;
-  };
-  canSendMap[id % CAN_MAX_MESSAGE_ID] = obdFrame;
-  xSemaphoreGive(sendSemaphore);
-  return true;
+  auto res = sendBuffer.push(obdFrame);
+  if (res) {
+    xEventGroupSetBits(events, TWAI_EVENT_TX);
+  }  
+  return res;
 }
 
 twai_status_t TWAI::begin(TwaiSpeed twaiSpeed) {
   speed = twaiSpeed;
-
+  
+  if (events == NULL) {
+    events = xEventGroupCreate();
+    if (events == NULL) {
+      printf("Failed to create event group\n");
+      return TWAI_INIT_TASK_CREATION_FAILED;
+    }
+  }
+  
   if (callbackTaskHandle == NULL) {
-    if (xTaskCreate(callbackTask, "TWAI::callbackTask", 2048, this, 2,
-                    &callbackTaskHandle) != pdPASS) {
+    if (xTaskCreatePinnedToCore(callbackTask, "TWAI::callbackTask", 2048, this,
+                                2, &callbackTaskHandle, 1) != pdPASS) {
       printf("Failed to create TWAI::callbackTask\n");
       end();
       return TWAI_CALLBACK_TASK_CREATION_FAILED;
     }
   }
-  vTaskSuspend(callbackTaskHandle);
 
   if (receiveTaskHandle == NULL) {
-    if (xTaskCreate(receiveTask, "TWAI::receive", 2048, this, 5,
-                    &receiveTaskHandle) != pdPASS) {
+    if (xTaskCreatePinnedToCore(receiveTask, "TWAI::receive", 2048, this, 5,
+                                &receiveTaskHandle, 1) != pdPASS) {
       printf("Failed to create TWAI::receiveTask\n");
       end();
       return TWAI_RECEIVE_TASK_CREATION_FAILED;
     }
   }
-  vTaskSuspend(receiveTaskHandle);
 
   if (sendTaskHandle == NULL) {
-    if (xTaskCreate(sendTask, "TWAI::send", 2048, this, 2, &sendTaskHandle) !=
-        pdPASS) {
+    if (xTaskCreatePinnedToCore(sendTask, "TWAI::send", 2048, this, 2,
+                                &sendTaskHandle, 1) != pdPASS) {
       printf("Failed to create TWAI::sendTask\n");
       end();
       return TWAI_SEND_TASK_CREATION_FAILED;
     }
   }
 
-  vTaskSuspend(sendTaskHandle);
-
   if (initTaskHandle == NULL) {
-    if (xTaskCreate(initTask, "TWAI::initTask", 2048, this, 2,
-                    &initTaskHandle) != pdPASS) {
+    if (xTaskCreatePinnedToCore(initTask, "TWAI::initTask", 2048, this, 2,
+                    &initTaskHandle, 1) != pdPASS) {
       printf("Failed to create TWAI::initTask\n");
       end();
       return TWAI_INIT_TASK_CREATION_FAILED;
     }
-  }    
-  vTaskResume(initTaskHandle);
+  }
 
+  if (watchdogTaskHandle == NULL) {
+    if (xTaskCreatePinnedToCore(watchdogTask, "TWAI::watchdogTask", 2048, this, 2,
+                                &watchdogTaskHandle, 1) != pdPASS) {
+      printf("Failed to create TWAI::watchdogTask\n");
+      end();
+      return TWAI_WATCHDOG_TASK_CREATION_FAILED;
+    }
+  }
+
+  xTaskNotifyGive(initTaskHandle);
   return TWAI_SUCCESS;
 }
 
 void TWAI::receiveTask(void *instance) {  
   TWAI *twai = static_cast<TWAI *>(instance);
-  if (twai->receiveSemaphore == NULL) {
-    vTaskSuspend(NULL);    
-  }
-
-  printf("TWAI::Receive task started\n");
-  CanFrame rxFrame;
-  while (true) {
-    if (twai->readFrame(&rxFrame, portMAX_DELAY)) {
-      if (xSemaphoreTake(twai->receiveSemaphore, pdMS_TO_TICKS(1)) == pdTRUE) {        
-        twai->canReceiveMap[rxFrame.identifier % CAN_MAX_MESSAGE_ID] = rxFrame;
-        xSemaphoreGive(twai->receiveSemaphore);
-      }
-    } else{
-      if(!twai->isBusAlive()) {        
-        twai->stopReceiver();
+  CanFrame frame;
+  while (true) {    
+    if (twai->readFrame(&frame, portMAX_DELAY)) {      
+      if (twai->receiveBuffer.push(frame)) {
+        xEventGroupSetBits(twai->events, TWAI_EVENT_RX);
+      } else {
+        printf("TWAI::receiveTask() receive buffer full, dropping frame\n");
       }
     }
   }
 }
 
-void TWAI::stopReceiver() {
-  printf("TWAI bus is not alive. Attempting to reinitialize from Receiver\n");
-  vTaskSuspend(callbackTaskHandle);  
-  vTaskSuspend(sendTaskHandle);  
-  vTaskResume(initTaskHandle);
-  vTaskSuspend(receiveTaskHandle);
-}
+bool TWAI::isBusAlive() {  
+  twai_status_info_t status;
 
-void TWAI::stopSender() {
-  printf("TWAI bus is not alive. Attempting to reinitialize from Sender\n");
-  vTaskSuspend(callbackTaskHandle);  
-  vTaskSuspend(receiveTaskHandle);  
-  vTaskResume(initTaskHandle);
-  vTaskSuspend(sendTaskHandle);
-}
+  if (twai_get_status_info(&status) != ESP_OK)
+    return false;
 
-bool TWAI::isBusAlive() {
-  twai_status_info_t statusInfo;
-  if (twai_get_status_info(&statusInfo) == ESP_OK) {
-    return statusInfo.state == TWAI_STATE_RUNNING;
-  }
-  return false;
+  if (status.state == TWAI_STATE_BUS_OFF)
+    return false;
+
+  if (status.state == TWAI_STATE_STOPPED)
+    return false;
+
+  return true;
 }
 
 void TWAI::initTask(void *instance) {
-  printf("Twai initTask started\n");
   TWAI *twai = static_cast<TWAI *>(instance);
-
   while (true) {
-    twai_status_t status = twai->init();
-    if (status == TWAI_SUCCESS) {
-      vTaskResume(twai->callbackTaskHandle);
-      vTaskResume(twai->receiveTaskHandle);
-      vTaskResume(twai->sendTaskHandle);
-      vTaskSuspend(NULL);
-    } else {
-      printf("TWAI initialization failed with status: %d. Retrying...\n", status);
-    }
-    vTaskDelay(pdMS_TO_TICKS(TWAI_INITIALIZE_LOOP_DELAY));
-  }  
+    xEventGroupWaitBits(twai->events, TWAI_EVENT_REINIT, pdTRUE, pdFALSE,
+                        portMAX_DELAY);
+    printf("Restarting TWAI\n");
+    twai->init();
+  }
 }
 
 void TWAI::sendTask(void *instance) {
   TWAI *twai = static_cast<TWAI *>(instance);
-  if (twai->sendSemaphore == NULL) {
-    vTaskSuspend(NULL);
-  }
-  printf("TWAI::Send task started\n");
-  uint32_t id = 0;
-  while (true) {    
-    if (xSemaphoreTake(twai->sendSemaphore,
-                       pdMS_TO_TICKS(CAN_SEND_WAIT_SEMAPHORE)) != pdTRUE) {
-      printf("Can't obtain sendSemaphore in sendTask\n");
-      continue;
-    }
+  CanFrame frame;
 
-    auto frame = twai->canSendMap[id];
-    twai->canSendMap[id].data_length_code = 0;
-    xSemaphoreGive(twai->sendSemaphore);
-    if (frame.data_length_code == 0) {
-      id++;
-      if (id >= CAN_MAX_MESSAGE_ID) {
-        id = 0;
-      }
-      continue;
-    }
+  while (true) {
+    xEventGroupWaitBits(twai->events, TWAI_EVENT_TX, pdTRUE, pdFALSE,
+                        portMAX_DELAY);
 
-    if (twai->writeFrame(&frame)) {
-      twai->errorCallback(frame, CAN_SUCCESS);
-      id++;
-      if (id >= CAN_MAX_MESSAGE_ID) {
-        id = 0;
+    while (twai->sendBuffer.pop(&frame)) {
+      if (!twai->writeFrame(&frame)) {
+        twai->errorCallback(frame, CAN_SEND_ERROR);
+        if (!twai->isBusAlive()) {        
+          twai->requestReinit();
+          break;
+        }
+      } else {
+        twai->errorCallback(frame, CAN_SUCCESS);
       }
-    }  else {
-      twai->errorCallback(frame, CAN_SEND_ERROR);
-      if (!twai->isBusAlive()) {      
-        twai->stopSender();
-      }
-      vTaskDelay(pdMS_TO_TICKS(10));
     }
-    vTaskDelay(pdMS_TO_TICKS(CAN_SEND_LOOP_WAIT));
   }
+}
+
+void TWAI::watchdogTask(void *instance) {
+  TWAI *twai = static_cast<TWAI *>(instance);
+  twai_status_info_t status;
+
+  while (true) {
+    if (!twai->isBusAlive()) {
+      printf("TWAI bus is not alive. Attempting to reinitialize from Watchdog\n");
+      twai->requestReinit();
+    }
+    vTaskDelay(pdMS_TO_TICKS(200));
+  } 
 }
 
 void TWAI::callbackTask(void *instance) {
   TWAI *twai = static_cast<TWAI *>(instance);
-  if (twai->receiveSemaphore == NULL) {
-    vTaskSuspend(NULL);
-  }
 
-  TickType_t lastWakeTime = xTaskGetTickCount();
-
-  CanFrame localFrame[CAN_RECEIVE_BUFFER_SIZE];
-
-  uint frameIndex = 0;
-  uint id = 0;
-
+  CanFrame frame;
   while (true) {
-    if (xSemaphoreTake(twai->receiveSemaphore, pdMS_TO_TICKS(CAN_RECEIVE_WAIT_TIMEOUT)) == pdTRUE) {
-      while (id < CAN_MAX_MESSAGE_ID && frameIndex < CAN_RECEIVE_BUFFER_SIZE) {
-        auto frame = twai->canReceiveMap[id];
-        if (frame.data_length_code != 0) {
-          twai->canReceiveMap[id].data_length_code = 0;
-          localFrame[frameIndex++] = frame;
-        }
-        id++;
-      }
+    xEventGroupWaitBits(twai->events, TWAI_EVENT_RX, pdTRUE, pdFALSE,
+                        portMAX_DELAY);
 
-      if (id >= CAN_MAX_MESSAGE_ID) {
-        id = 0;
-      }
-
-      xSemaphoreGive(twai->receiveSemaphore);
+    while (twai->receiveBuffer.pop(&frame)) {
+      twai->callback(frame);
     }
-
-    for (uint i = 0; i < frameIndex; i++) {
-      twai->callback(localFrame[i]);
-    }
-
-    frameIndex = 0;
-    vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(CAN_RECEIVE_LOOP_TIMEOUT));
   }
 }
 
@@ -231,26 +179,11 @@ twai_status_t TWAI::end() {
 
 twai_status_t TWAI::init() {
   twai_status_t cStatus = end();
+  vTaskDelay(pdMS_TO_TICKS(50));
   bool success = cStatus == TWAI_SUCCESS || cStatus == TWAI_STOP_FAILED || cStatus == TWAI_UNISTALL_FAILED;
   if (!success) {
     printf("Failed to end driver, status: %d\n", cStatus);
     return cStatus;
-  }
-
-  if (sendSemaphore == NULL) {
-    sendSemaphore = xSemaphoreCreateMutex();
-    if (sendSemaphore == NULL) {
-      printf("sendSemaphore allocation failed!\n");
-      return TWAI_SEND_SEMAPHORE_ALLOCATION_FAILED;
-    }
-  }
-
-  if (receiveSemaphore == NULL) {
-    receiveSemaphore = xSemaphoreCreateMutex();
-    if (receiveSemaphore == NULL) {
-      printf("receiveSemaphore allocation failed!\n");
-      return TWAI_RECEIVE_SEMAPHORE_ALLOCATION_FAILED;
-    }
   }
   
   twai_general_config_t g_config = {.mode = TWAI_MODE_NORMAL,
@@ -290,7 +223,15 @@ twai_status_t TWAI::init() {
   }
   
   printf("TWAI initialized successfully with speed %d\n", speed);
+  reinitInProgress = false;
   return TWAI_SUCCESS;
+}
+
+void TWAI::requestReinit() {
+  if (!reinitInProgress) {
+    reinitInProgress = true;
+    xEventGroupSetBits(events, TWAI_EVENT_REINIT);
+  }
 }
 
 TWAI::~TWAI() {  
@@ -309,14 +250,6 @@ TWAI::~TWAI() {
   if (sendTaskHandle) {
     vTaskDelete(sendTaskHandle);
     sendTaskHandle = NULL;
-  }
-  if (sendSemaphore) {
-    vSemaphoreDelete(sendSemaphore);
-    sendSemaphore = NULL;
-  }
-  if (receiveSemaphore) {
-    vSemaphoreDelete(receiveSemaphore);
-    receiveSemaphore = NULL;
-  }
+  }  
   end();
 }

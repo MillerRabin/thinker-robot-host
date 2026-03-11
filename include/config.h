@@ -24,7 +24,7 @@
 #define IMU_TX_GPIO 17
 
 #define I2C_SDA 21
-#define I2C_SCL 22
+#define I2C_SCL 27
 #define I2C_SPEED 400000U
 
 #define CAN_SHOULDER_SET_YZ_DEGREE 0x01
@@ -79,6 +79,8 @@
 #define CAN_CLAW_FIRMWARE_UPGRADE_CONFIRMED 0x58
 
 #define CAN_MAX_MESSAGE_ID 0x60
+#define CAN_RX_BUFFER_SIZE 32
+#define CAN_TX_BUFFER_SIZE 32
 
 constexpr unsigned int CAN_RECEIVE_BUFFER_SIZE = 10;
 
@@ -113,3 +115,7 @@ constexpr unsigned int CAN_RECEIVE_BUFFER_SIZE = 10;
 #define SOCKET_ELBOW_TAG 0x04
 #define SOCKET_WRIST_TAG 0x05
 #define SOCKET_CLAW_TAG 0x06
+
+#define TWAI_EVENT_RX BIT0
+#define TWAI_EVENT_TX BIT1
+#define TWAI_EVENT_REINIT BIT2

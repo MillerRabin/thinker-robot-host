@@ -1,16 +1,16 @@
 
 #include "localINA3221.h"
 
-INA3221 LocalINA3221::ina(INA3221_ADDR40_GND);
+INA3221 LocalINA3221::ina(INA3221_ADDR41_VCC);
 DetectorsCallback LocalINA3221::callback;
 SemaphoreHandle_t LocalINA3221::loopMutex;
 LocalINAData LocalINA3221::data;
 
 bool LocalINA3221::begin(TwoWire& wire, DetectorsCallback callback) {
   LocalINA3221::callback = callback;
-  LocalINA3221::loopMutex = xSemaphoreCreateMutex();
+  LocalINA3221::loopMutex = xSemaphoreCreateMutex();      
   if (!ina.begin(&wire)) {
-    Serial.println("INA3221 is not found.");
+    printf("INA3221 is not found\n");
     return false;
   }
   ina.reset();

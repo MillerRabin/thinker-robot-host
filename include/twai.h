@@ -1,11 +1,10 @@
 #pragma once
 
+#include <Arduino.h>
 #include "config.h"
 #include "driver/twai.h"
-#include <Arduino.h>
-#include <map>
+#include "canRingBuffer.h"
 
-typedef twai_message_t CanFrame;
 typedef void (* TWAICallback)( CanFrame frame );
 typedef void (* TWAIErrorCallback)( CanFrame frame, int code );
 
@@ -20,7 +19,8 @@ typedef enum : int32_t {
   TWAI_INIT_TASK_CREATION_FAILED = -7,
   TWAI_CALLBACK_TASK_CREATION_FAILED = -8,
   TWAI_RECEIVE_TASK_CREATION_FAILED = -9,
-  TWAI_SEND_TASK_CREATION_FAILED = -10
+  TWAI_SEND_TASK_CREATION_FAILED = -10,
+  TWAI_WATCHDOG_TASK_CREATION_FAILED = -11
 } twai_status_t;
 
 enum TwaiSpeed : uint8_t {
@@ -54,33 +54,38 @@ class TWAI {
     TaskHandle_t callbackTaskHandle = NULL;
     TaskHandle_t receiveTaskHandle = NULL;
     TaskHandle_t sendTaskHandle = NULL;
-    CanFrame rxFrame;
+    TaskHandle_t watchdogTaskHandle = NULL;
     const TWAICallback callback;
-    const TWAIErrorCallback errorCallback; 
-    CanFrame canSendMap[CAN_MAX_MESSAGE_ID];
-    CanFrame canReceiveMap[CAN_MAX_MESSAGE_ID];
+    const TWAIErrorCallback errorCallback;           
     static void callbackTask(void* instance);
     static void sendTask(void *instance);
     static void receiveTask(void* instance);
     static void initTask(void *instance);
-    
+    static void watchdogTask(void *instance);
     twai_status_t end();
+    volatile bool reinitInProgress = false;
     public:
+      void requestReinit();
       twai_status_t init();
-      SemaphoreHandle_t receiveSemaphore;
-      SemaphoreHandle_t sendSemaphore;
+      CanRingBuffer receiveBuffer;
+      CanRingBuffer sendBuffer;
+      EventGroupHandle_t events = NULL;
       bool isBusAlive();
-      void stopReceiver();
-      void stopSender();
       inline bool IRAM_ATTR readFrame(CanFrame *frame,
-                                      uint32_t timeout = 1000) {        
-        if ((frame) && twai_receive(frame, pdMS_TO_TICKS(timeout)) == ESP_OK) {
+                                      TickType_t timeout = portMAX_DELAY) {
+        if (!frame)
+          return false;
+
+        auto status = twai_receive(frame, timeout);
+        if (status == ESP_OK)
           return true;
-        }
+        
+        vTaskDelay(pdMS_TO_TICKS(1000));
         return false;
       }
-      inline bool IRAM_ATTR writeFrame(CanFrame *frame, uint32_t timeout = 1) {        
-        if ((frame) && twai_transmit(frame, pdMS_TO_TICKS(timeout)) == ESP_OK) {
+
+      inline bool IRAM_ATTR writeFrame(CanFrame *frame, TickType_t timeout = portMAX_DELAY) {        
+        if ((frame) && twai_transmit(frame, timeout) == ESP_OK) {
           return true;
         }
         return false;                  
