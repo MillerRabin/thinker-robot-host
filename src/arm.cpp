@@ -10,7 +10,7 @@ ArmStatus Arm::status;
 PowerManagement Arm::powerManagement;
 
 void Arm::twaiCallback(CanFrame frame) {
-  uint32_t ident = frame.identifier;    
+  uint32_t ident = frame.identifier;  
   if (ident == CAN_SHOULDER_QUATERNION) {
     Arm::status.shoulderQuaternionOK = true;
     shoulder.imu.quaternion.deserialize(frame.data);
@@ -114,7 +114,7 @@ void Arm::twaiErrorCallback(CanFrame frame, int code) {
     Arm::status.canSendOK = true;
   } else {
     Arm::status.canSendOK = false;    
-    printf("frame send error %d, code %d\n", frame.identifier, code);
+    //printf("frame send error 0x%x, code %d\n", frame.identifier, code);
   }  
 }
 

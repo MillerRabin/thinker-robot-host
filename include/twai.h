@@ -20,7 +20,9 @@ typedef enum : int32_t {
   TWAI_CALLBACK_TASK_CREATION_FAILED = -8,
   TWAI_RECEIVE_TASK_CREATION_FAILED = -9,
   TWAI_SEND_TASK_CREATION_FAILED = -10,
-  TWAI_WATCHDOG_TASK_CREATION_FAILED = -11
+  TWAI_WATCHDOG_TASK_CREATION_FAILED = -11,
+  TWAI_EVENT_GROUP_CREATION_FAILED = -12,
+  TWAI_WRITE_MUTEX_CREATION_FAILED = -13
 } twai_status_t;
 
 enum TwaiSpeed : uint8_t {
@@ -64,6 +66,7 @@ class TWAI {
     static void watchdogTask(void *instance);
     twai_status_t end();
     volatile bool reinitInProgress = false;
+    SemaphoreHandle_t writeMutex = NULL;
     public:
       void requestReinit();
       twai_status_t init();
@@ -84,12 +87,17 @@ class TWAI {
         return false;
       }
 
-      inline bool IRAM_ATTR writeFrame(CanFrame *frame, TickType_t timeout = portMAX_DELAY) {        
+      inline bool IRAM_ATTR writeFrame(CanFrame *frame, TickType_t timeout = portMAX_DELAY) {
+        if (reinitInProgress) {
+          return false;
+        }
+          
         if ((frame) && twai_transmit(frame, timeout) == ESP_OK) {
           return true;
         }
         return false;                  
       }
+
       TWAI(const gpio_num_t rxPin, const gpio_num_t txPin,
            TWAICallback callback, TWAIErrorCallback errorCallback)
           : rxPin(rxPin), txPin(txPin), callback(callback),

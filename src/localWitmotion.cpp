@@ -3,7 +3,7 @@
 uint32_t LocalWitmotion::c_uiBaud[8] = { 230400, 115200, 57600, 38400, 19200, 9600 };
 volatile bool LocalWitmotion::dataAvailable = false;
 LocalWitmotion *LocalWitmotion::instance = NULL;
-SemaphoreHandle_t LocalWitmotion::loopMutex;
+SemaphoreHandle_t LocalWitmotion::loopMutex = NULL;
 
 void LocalWitmotion::SensorUartSend(uint8_t *p_data, uint32_t uiSize) {
   instance->port.write(p_data, uiSize); 
@@ -149,6 +149,9 @@ void LocalWitmotion::SensorDataUpdata(uint32_t uiReg, uint32_t uiRegNum) {
     }
     uiReg++;
   }
+  if (LocalWitmotion::loopMutex == NULL)
+    return;
+
   if (xSemaphoreTake(LocalWitmotion::loopMutex, pdMS_TO_TICKS(10))) {
     instance->data.rawQuaternion = instance->quaternion;    
     instance->data.rawAccelerometer = instance->accelerometer;
@@ -204,7 +207,7 @@ LocalWitmotion::LocalWitmotion(HardwareSerial& port,
       callback(callback) {
   port.setRxBufferSize(2048);
   LocalWitmotion::instance = this;  
-  LocalWitmotion::loopMutex = xSemaphoreCreateMutex();  
+  LocalWitmotion::loopMutex = xSemaphoreCreateMutex();
   WitInit(WIT_PROTOCOL_NORMAL, 0xFF);  
   WitSerialWriteRegister(SensorUartSend);  
   WitRegisterCallBack(SensorDataUpdata);  
@@ -212,6 +215,8 @@ LocalWitmotion::LocalWitmotion(HardwareSerial& port,
 }
 
 LocalWitmotionData LocalWitmotion::getLocalData() {
+  if (LocalWitmotion::loopMutex == NULL)
+    return this->prevData;
   if (xSemaphoreTake(loopMutex, pdMS_TO_TICKS(IMU_WAIT_MUTEX))) {
     LocalWitmotionData localData = this->data;
     xSemaphoreGive(loopMutex);

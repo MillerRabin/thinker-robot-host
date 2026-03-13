@@ -1,29 +1,44 @@
 #include "twai.h"
 
 bool TWAI::sendData(uint32_t id, uint8_t *data) {
+  if (writeMutex == NULL)
+    return false;
   CanFrame obdFrame = {0};
   obdFrame.identifier = id;
   obdFrame.data_length_code = 8;
   obdFrame.extd = 0;
   memcpy(obdFrame.data, data, 8);
-  auto res = sendBuffer.push(obdFrame);
-  if (res) {
-    xEventGroupSetBits(events, TWAI_EVENT_TX);
+  if (xSemaphoreTake(writeMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+    auto res = sendBuffer.push(obdFrame);
+    xSemaphoreGive(writeMutex);
+    if (res) {
+      xEventGroupSetBits(events, TWAI_EVENT_TX);
+    }
+    return res;
+  } else {
+    return false;
   }  
-  return res;
 }
 
 twai_status_t TWAI::begin(TwaiSpeed twaiSpeed) {
   speed = twaiSpeed;
-  
+
+  if (writeMutex == NULL) {
+    writeMutex = xSemaphoreCreateMutex();
+    if (writeMutex == NULL) {
+      printf("Failed to create write mutex\n");
+      return TWAI_WRITE_MUTEX_CREATION_FAILED;
+    }
+  }
+
   if (events == NULL) {
     events = xEventGroupCreate();
     if (events == NULL) {
       printf("Failed to create event group\n");
-      return TWAI_INIT_TASK_CREATION_FAILED;
+      return TWAI_EVENT_GROUP_CREATION_FAILED;
     }
   }
-  
+
   if (callbackTaskHandle == NULL) {
     if (xTaskCreatePinnedToCore(callbackTask, "TWAI::callbackTask", 2048, this,
                                 2, &callbackTaskHandle, 1) != pdPASS) {
@@ -43,8 +58,8 @@ twai_status_t TWAI::begin(TwaiSpeed twaiSpeed) {
   }
 
   if (sendTaskHandle == NULL) {
-    if (xTaskCreatePinnedToCore(sendTask, "TWAI::send", 2048, this, 2,
-                                &sendTaskHandle, 1) != pdPASS) {
+    if (xTaskCreate(sendTask, "TWAI::send", 4096, this, 5, &sendTaskHandle) !=
+        pdPASS) {
       printf("Failed to create TWAI::sendTask\n");
       end();
       return TWAI_SEND_TASK_CREATION_FAILED;
@@ -53,7 +68,7 @@ twai_status_t TWAI::begin(TwaiSpeed twaiSpeed) {
 
   if (initTaskHandle == NULL) {
     if (xTaskCreatePinnedToCore(initTask, "TWAI::initTask", 2048, this, 2,
-                    &initTaskHandle, 1) != pdPASS) {
+                                &initTaskHandle, 1) != pdPASS) {
       printf("Failed to create TWAI::initTask\n");
       end();
       return TWAI_INIT_TASK_CREATION_FAILED;
@@ -61,8 +76,8 @@ twai_status_t TWAI::begin(TwaiSpeed twaiSpeed) {
   }
 
   if (watchdogTaskHandle == NULL) {
-    if (xTaskCreatePinnedToCore(watchdogTask, "TWAI::watchdogTask", 2048, this, 2,
-                                &watchdogTaskHandle, 1) != pdPASS) {
+    if (xTaskCreatePinnedToCore(watchdogTask, "TWAI::watchdogTask", 2048, this,
+                                2, &watchdogTaskHandle, 1) != pdPASS) {
       printf("Failed to create TWAI::watchdogTask\n");
       end();
       return TWAI_WATCHDOG_TASK_CREATION_FAILED;
@@ -73,21 +88,23 @@ twai_status_t TWAI::begin(TwaiSpeed twaiSpeed) {
   return TWAI_SUCCESS;
 }
 
-void TWAI::receiveTask(void *instance) {  
+void TWAI::receiveTask(void *instance) {
   TWAI *twai = static_cast<TWAI *>(instance);
   CanFrame frame;
-  while (true) {    
-    if (twai->readFrame(&frame, portMAX_DELAY)) {      
+  while (true) {
+    if (twai->readFrame(&frame, pdMS_TO_TICKS(100))) {
       if (twai->receiveBuffer.push(frame)) {
         xEventGroupSetBits(twai->events, TWAI_EVENT_RX);
       } else {
         printf("TWAI::receiveTask() receive buffer full, dropping frame\n");
       }
+    } else {
+      printf("Receive timeout\n");
     }
   }
 }
 
-bool TWAI::isBusAlive() {  
+bool TWAI::isBusAlive() {
   twai_status_info_t status;
 
   if (twai_get_status_info(&status) != ESP_OK)
@@ -96,8 +113,11 @@ bool TWAI::isBusAlive() {
   if (status.state == TWAI_STATE_BUS_OFF)
     return false;
 
-  if (status.state == TWAI_STATE_STOPPED)
+  if (status.state == TWAI_STATE_STOPPED) {
+    printf("Bus is stopped\n");
     return false;
+  }
+    
 
   return true;
 }
@@ -119,15 +139,17 @@ void TWAI::sendTask(void *instance) {
   while (true) {
     xEventGroupWaitBits(twai->events, TWAI_EVENT_TX, pdTRUE, pdFALSE,
                         portMAX_DELAY);
-
-    while (twai->sendBuffer.pop(&frame)) {
-      if (!twai->writeFrame(&frame)) {
+    while (twai->sendBuffer.pop(&frame)) {      
+      if (!twai->writeFrame(&frame, pdMS_TO_TICKS(100))) {
         twai->errorCallback(frame, CAN_SEND_ERROR);
-        if (!twai->isBusAlive()) {        
+        /*if (!twai->isBusAlive()) {
+          printf("TWAI bus is not alive. Attempting to reinitialize from "
+                 "SendTask\n");
           twai->requestReinit();
           break;
-        }
-      } else {
+        }*/
+      } 
+      else {
         twai->errorCallback(frame, CAN_SUCCESS);
       }
     }
@@ -136,15 +158,14 @@ void TWAI::sendTask(void *instance) {
 
 void TWAI::watchdogTask(void *instance) {
   TWAI *twai = static_cast<TWAI *>(instance);
-  twai_status_info_t status;
-
   while (true) {
     if (!twai->isBusAlive()) {
-      printf("TWAI bus is not alive. Attempting to reinitialize from Watchdog\n");
+      printf("TWAI bus is not alive. Attempting to reinitialize from "
+             "Watchdog\n");
       twai->requestReinit();
     }
-    vTaskDelay(pdMS_TO_TICKS(200));
-  } 
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
 }
 
 void TWAI::callbackTask(void *instance) {
@@ -170,7 +191,7 @@ twai_status_t TWAI::end() {
   }
 
   sStatus = twai_driver_uninstall();
-   if (sStatus != ESP_OK) {
+  if (sStatus != ESP_OK) {
     printf("TWAI::end() Failed to uninstall driver 0x%x\n", sStatus);
     return TWAI_UNISTALL_FAILED;
   }
@@ -178,14 +199,17 @@ twai_status_t TWAI::end() {
 }
 
 twai_status_t TWAI::init() {
+  reinitInProgress = true;
+
   twai_status_t cStatus = end();
   vTaskDelay(pdMS_TO_TICKS(50));
-  bool success = cStatus == TWAI_SUCCESS || cStatus == TWAI_STOP_FAILED || cStatus == TWAI_UNISTALL_FAILED;
+  bool success = cStatus == TWAI_SUCCESS || cStatus == TWAI_STOP_FAILED ||
+                 cStatus == TWAI_UNISTALL_FAILED;
   if (!success) {
     printf("Failed to end driver, status: %d\n", cStatus);
     return cStatus;
   }
-  
+
   twai_general_config_t g_config = {.mode = TWAI_MODE_NORMAL,
                                     .tx_io = (gpio_num_t)txPin,
                                     .rx_io = (gpio_num_t)rxPin,
@@ -203,9 +227,9 @@ twai_status_t TWAI::init() {
       TWAI_TIMING_CONFIG_800KBITS(), TWAI_TIMING_CONFIG_1MBITS()};
   twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
-  auto tConfig = &t_config[speed];   
+  auto tConfig = &t_config[speed];
   auto iStatus = twai_driver_install(&g_config, tConfig, &f_config);
-  
+
   if (iStatus != ESP_OK) {
     printf("Failed to install driver, status: 0x%x\n", iStatus);
   }
@@ -221,7 +245,7 @@ twai_status_t TWAI::init() {
     end();
     return TWAI_START_FAILED;
   }
-  
+
   printf("TWAI initialized successfully with speed %d\n", speed);
   reinitInProgress = false;
   return TWAI_SUCCESS;
@@ -234,7 +258,7 @@ void TWAI::requestReinit() {
   }
 }
 
-TWAI::~TWAI() {  
+TWAI::~TWAI() {
   if (initTaskHandle) {
     vTaskDelete(initTaskHandle);
     initTaskHandle = NULL;
@@ -250,6 +274,6 @@ TWAI::~TWAI() {
   if (sendTaskHandle) {
     vTaskDelete(sendTaskHandle);
     sendTaskHandle = NULL;
-  }  
+  }
   end();
 }

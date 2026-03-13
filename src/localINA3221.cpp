@@ -3,7 +3,7 @@
 
 INA3221 LocalINA3221::ina(INA3221_ADDR41_VCC);
 DetectorsCallback LocalINA3221::callback;
-SemaphoreHandle_t LocalINA3221::loopMutex;
+SemaphoreHandle_t LocalINA3221::loopMutex = NULL;
 LocalINAData LocalINA3221::data;
 
 bool LocalINA3221::begin(TwoWire& wire, DetectorsCallback callback) {
@@ -26,13 +26,18 @@ bool LocalINA3221::begin(TwoWire& wire, DetectorsCallback callback) {
 void LocalINA3221::loop(void* instance) {
   LocalINA3221* localINA = (LocalINA3221*)instance;
   while (true) {
+    if (LocalINA3221::loopMutex == NULL) {
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
+    }
+      
     if (xSemaphoreTake(LocalINA3221::loopMutex, pdMS_TO_TICKS(10))) {
       localINA->data.powerCh1.set(localINA->ina.getVoltage(INA3221_CH1), localINA->ina.getCurrent(INA3221_CH1));
       localINA->data.powerCh2.set(localINA->ina.getVoltage(INA3221_CH2), localINA->ina.getCurrent(INA3221_CH2));
       localINA->data.powerCh3.set(localINA->ina.getVoltage(INA3221_CH3), localINA->ina.getCurrent(INA3221_CH3));
       xSemaphoreGive(LocalINA3221::loopMutex);
       localINA->callback(CAN_PLATFORM_CPU_POWER, localINA->data.serializeCPULine());
-      localINA->callback(CAN_PLATFORM_ENGINES_POWER, localINA->data.serializeEnginesLine());      
+      localINA->callback(CAN_PLATFORM_ENGINES_POWER, localINA->data.serializeEnginesLine());
     }    
     vTaskDelay(pdMS_TO_TICKS(50));  
   }
@@ -40,12 +45,15 @@ void LocalINA3221::loop(void* instance) {
 
 LocalINAData LocalINA3221::getLocalData() {
   LocalINAData localData;
-  if (xSemaphoreTake(LocalINA3221::loopMutex, pdMS_TO_TICKS(10))) {
-    localData = data;
-    xSemaphoreGive(LocalINA3221::loopMutex);
-  } else {
-    //printf("INA3221 Can't obtain loopMutex semaphore lock");
-  }
+  if (LocalINA3221::loopMutex == NULL)
+    return localData;
+  
+    if (xSemaphoreTake(LocalINA3221::loopMutex, pdMS_TO_TICKS(10))) {
+      localData = data;
+      xSemaphoreGive(LocalINA3221::loopMutex);
+    } else {
+      // printf("INA3221 Can't obtain loopMutex semaphore lock");
+    }
   return localData;
 }
 

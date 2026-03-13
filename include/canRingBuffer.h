@@ -27,4 +27,7 @@ class CanRingBuffer {
 
       return true;
     }
+    inline uint16_t size() const {
+      return (head + CAN_RX_BUFFER_SIZE - tail) % CAN_RX_BUFFER_SIZE;
+    }
 };
