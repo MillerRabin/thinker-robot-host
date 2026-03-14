@@ -71,11 +71,10 @@ class TWAI {
       void requestReinit();
       twai_status_t init();
       CanRingBuffer receiveBuffer;
-      CanRingBuffer sendBuffer;
+      CanFrame sendBuffer[CAN_TX_BUFFER_SIZE];
       EventGroupHandle_t events = NULL;
       bool isBusAlive();
-      inline bool IRAM_ATTR readFrame(CanFrame *frame,
-                                      TickType_t timeout = portMAX_DELAY) {
+      inline bool IRAM_ATTR readFrame(CanFrame *frame, TickType_t timeout = portMAX_DELAY) {
         if (!frame)
           return false;
 
