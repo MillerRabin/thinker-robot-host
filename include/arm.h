@@ -13,6 +13,8 @@
 #include "AsyncJson.h"
 #include "responseStatus.h"
 
+using Parser = int16_t (*)(float);
+
 class ArmStatus {
   public: 
     bool canSendOK;
@@ -47,26 +49,24 @@ class Arm {
     static void loop(void* parameters);
     static bool getFloat(JsonObject jsonObj, const char* key, float& result);
     static bool getBool(JsonObject jsonObj, const char* key, bool& result);
-    static void setPowerState(JsonObject data);
-    static bool sendArmData(
-        JsonObject data,
-        const char *keyY,
-        const char *keyZ,
-        const char *keyX,
-        const char *keyAux,
-        const uint32_t canMessage);
-
-  public:
-    static ArmStatus status;
-    static ArmPlatform platform;
-    static ArmShoulder shoulder;
-    static ArmElbow elbow;
-    static ArmWrist wrist;
-    static ArmClaw claw;
-    static PowerManagement powerManagement;    
-    static void begin(TwoWire &wire);
-    static void set(JsonObject data);
-    static void setRotate(JsonObject data);
-    static StatusResponse upgrade(JsonObject data);
-    static void tare(JsonObject data);
-  };
+    static void setPowerState(JsonObject data);   
+    static bool sendArmData(JsonObject data, const char *key1,
+                            int16_t (*parser1)(float), const char *key2,
+                            int16_t (*parser2)(float), const char *key3,
+                            int16_t (*parser3)(float), const char *key4,
+                            int16_t (*parser4)(float),
+                            const uint32_t canMessage);
+    public:
+      static ArmStatus status;
+      static ArmPlatform platform;
+      static ArmShoulder shoulder;
+      static ArmElbow elbow;
+      static ArmWrist wrist;
+      static ArmClaw claw;
+      static PowerManagement powerManagement;
+      static void begin(TwoWire & wire);
+      static void set(JsonObject data);
+      static void setRotate(JsonObject data);
+      static StatusResponse upgrade(JsonObject data);
+      static void tare(JsonObject data);
+    };

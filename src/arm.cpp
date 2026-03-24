@@ -231,68 +231,82 @@ void Arm::setPowerState(JsonObject data) {
     cpuPowerEnabled ? powerManagement.enableCPUPower() : powerManagement.disableCPUPower();
 
   if (hasDetecorsPowerDisabled)    
-    detectorsPowerDisabled ? powerManagement.disableDetectors() : powerManagement.enableDetectors();
-  
-  
+    detectorsPowerDisabled ? powerManagement.disableDetectors() : powerManagement.enableDetectors(); 
 }
-bool Arm::sendArmData(
-    JsonObject data,
-    const char *key1,
-    const char *key2,
-    const char *key3,
-    const char *key4,
-    const uint32_t canMessage) {
+
+bool Arm::sendArmData(JsonObject data, const char *key1,
+                      int16_t (*parser1)(float), const char *key2,
+                      int16_t (*parser2)(float), const char *key3,
+                      int16_t (*parser3)(float), const char *key4,
+                      int16_t (*parser4)(float), const uint32_t canMessage) {
   float val1 = NAN;
-  bool hasVal1 = getFloat(data, key1, val1);
+  bool hasVal1 = (key1 != nullptr && parser1 != nullptr) ? getFloat(data, key1, val1) : false;
+
   float val2 = NAN;
-  bool hasVal2 = getFloat(data, key2, val2);
+  bool hasVal2 = (key2 != nullptr && parser2 != nullptr) ? getFloat(data, key2, val2) : false;
+
   float val3 = NAN;
-  bool hasVal3 = getFloat(data, key3, val3);
+  bool hasVal3 = (key3 != nullptr && parser3 != nullptr) ? getFloat(data, key3, val3) : false;
+
   float val4 = NAN;
-  bool hasVal4 = getFloat(data, key4, val4);
-  
-  auto isValid = [](float v) {
-    return v >= 0.0f && v <= 320.0f;
-  };
+  bool hasVal4 = (key4 != nullptr && parser4 != nullptr) ? getFloat(data, key4, val4) : false;
 
-
-  if ((hasVal1 && !isValid(val1)) ||
-      (hasVal2 && !isValid(val2)) ||
-      (hasVal3 && !isValid(val3)) ||
-      (hasVal4 && !isValid(val4))) {    
+  if (!(hasVal1 || hasVal2 || hasVal3 || hasVal4)) {
     return false;
   }
 
-  if (hasVal1 || hasVal2 || hasVal3 || hasVal4) {
-    ArmDataFrame frame;
-    frame.values.param1 = hasVal1 ? (int16_t)(val1 * 100) : PARAMETER_IS_NAN;
-    frame.values.param2 = hasVal2 ? (int16_t)(val2 * 100) : PARAMETER_IS_NAN;
-    frame.values.param3 = hasVal3 ? (int16_t)(val3 * 100) : PARAMETER_IS_NAN;
-    frame.values.param4 = hasVal4 ? (int16_t)(val4 * 100) : PARAMETER_IS_NAN;
-    return twai.sendData(canMessage, frame.bytes);
-  }
-  
-  return false;
+  ArmDataFrame frame{};
+  frame.values.param1 = hasVal1 ? parser1(val1) : PARAMETER_IS_NAN;
+  frame.values.param2 = hasVal2 ? parser2(val2) : PARAMETER_IS_NAN;
+  frame.values.param3 = hasVal3 ? parser3(val3) : PARAMETER_IS_NAN;
+  frame.values.param4 = hasVal4 ? parser4(val4) : PARAMETER_IS_NAN;
+
+  return twai.sendData(canMessage, frame.bytes);
 }
 
 void Arm::set(JsonObject data) {
   setPowerState(data);
 
-  struct {
+  auto getAngle = [](float v) -> int16_t {
+    if (isnan(v) || v < 0.0f || v > 270.0f) {
+      return PARAMETER_IS_NAN;
+    }
+    return static_cast<int16_t>(v * 10.0f);
+  };
+
+  auto getTime = [](float v) -> int16_t {
+    if (isnan(v) || v < 0.0f || v > 65535.0f) {
+      return PARAMETER_IS_NAN;
+    }
+    return static_cast<int16_t>(v);
+  };
+
+  struct Action {
     const char *param1;
+    Parser parser1;
     const char *param2;
+    Parser parser2;
     const char *param3;
+    Parser parser3;
     const char *param4;
-    const uint32_t canId;
+    Parser parser4;
+    uint32_t canId;
     const char *name;
-  } actions[] = {
-      {"shoulder-y", "shoulder-z", "time", nullptr, CAN_SHOULDER_SET_YZ_DEGREE, "shoulder"},
-      {"elbow-y", "time", nullptr, nullptr, CAN_ELBOW_SET_Y_DEGREE, "elbow"},
-      {"wrist-y", "wrist-z", "time", nullptr, CAN_WRIST_SET_YZ_DEGREE, "wrist"},
-      {"claw-y", "claw-x", "claw-gripper", "time", CAN_CLAW_SET_XYG_DEGREE, "claw"}};
+  };
+
+  Action actions[] = {
+      {"shoulder-y", getAngle, "shoulder-z", getAngle, "timeMS", getTime, nullptr, nullptr, CAN_SHOULDER_SET_YZ_DEGREE, "shoulder"},
+      {"elbow-y", getAngle, "timeMS", getTime, nullptr, nullptr, nullptr, nullptr, CAN_ELBOW_SET_Y_DEGREE, "elbow"},
+      {"wrist-y", getAngle, "wrist-z", getAngle, "timeMS", getTime, nullptr, nullptr, CAN_WRIST_SET_YZ_DEGREE, "wrist"},
+      {"claw-y", getAngle, "claw-x", getAngle, "claw-gripper", getAngle, "timeMS", getTime, CAN_CLAW_SET_XYG_DEGREE, "claw"},
+  };
 
   for (auto &action : actions) {
-    sendArmData(data, action.param1, action.param2, action.param3, action.param4, action.canId);
+    sendArmData(data, action.param1, action.parser1, 
+                      action.param2, action.parser2, 
+                      action.param3, action.parser3, 
+                      action.param4, action.parser4, 
+                      action.canId);
   }
 }
 

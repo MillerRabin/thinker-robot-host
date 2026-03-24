@@ -102,7 +102,7 @@ constexpr unsigned int CAN_RECEIVE_BUFFER_SIZE = 10;
 #define IMU_MAX_DCD_SIZE 512
 #define IMU_WAIT_MUTEX 100
 
-#define PARAMETER_IS_NAN 32767
+#define PARAMETER_IS_NAN 65535
 
 #define ARM_PLATFORM  1
 #define ARM_SHOULDER  2
