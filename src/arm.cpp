@@ -119,6 +119,7 @@ void Arm::twaiErrorCallback(CanFrame frame, int code) {
 }
 
 void Arm::detectorsCallback(uint32_t id, uint64_t data) {
+  
   twai.sendData(id, (uint8_t*)&data);  
 }
 

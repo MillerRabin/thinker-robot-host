@@ -9,9 +9,12 @@ uint64_t Gyroscope::serialize(){
 }
 
 void Gyroscope::deserialize(uint8_t data[8]) {
-  this->x = (uint16_t)data[1] << 8 | data[0];
-  this->y = (uint16_t)data[3] << 8 | data[2];
-  this->z = (uint16_t)data[5] << 8 | data[4];
+  int16_t rawX = (int16_t)data[1] << 8 | data[0];
+  int16_t rawY = (int16_t)data[3] << 8 | data[2];
+  int16_t rawZ = (int16_t)data[5] << 8 | data[4];
+  this->x = qToFloat(rawX, Q1);
+  this->y = qToFloat(rawY, Q1);
+  this->z = qToFloat(rawZ, Q1);
 }
 
 void Gyroscope::set(float x, float y, float z) {

@@ -41,8 +41,7 @@ union ArmDataFrame
 };
 
 class Arm {
-  private:
-    static TWAI twai;        
+  private:    
     static void twaiCallback(CanFrame frame);
     static void twaiErrorCallback(CanFrame frame, int code);
     static void detectorsCallback(uint32_t id, uint64_t data);
@@ -57,6 +56,7 @@ class Arm {
                             int16_t (*parser4)(float),
                             const uint32_t canMessage);
     public:
+      static TWAI twai;
       static ArmStatus status;
       static ArmPlatform platform;
       static ArmShoulder shoulder;
