@@ -14,7 +14,7 @@ bool LocalINA3221::begin(TwoWire& wire, DetectorsCallback callback) {
     return false;
   }
   ina.reset();
-  ina.setShuntRes(100, 100, 100);
+  ina.setShuntRes(5, 100, 100);
   
   if (xTaskCreate(loop, "LocalINA3221::loop", 4096, this, 5, NULL) != pdPASS) {
     Serial.println("Failed to create loop task.");

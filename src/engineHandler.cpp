@@ -79,8 +79,9 @@ void socketLoop(void *parameters)
     response.claw.accelerometer = cacc.serialize();
     response.claw.gyroscope = cgyro.serialize();        
     response.claw.range = Arm::claw.range.serialize();
-    response.claw.barometer = Arm::claw.barometer.serialize();
-    uint8_t *st = reinterpret_cast<uint8_t *>(&response.status);
+    response.claw.barometer = Arm::claw.barometer.serialize();    
+    uint8_t st[8];
+    memcpy(st, &response.status, sizeof(response.status));
     Arm::twai.sendData(CAN_PLATFORM_STATUS, st);
     WebSocket.binaryAll(reinterpret_cast<uint8_t *>(&response), sizeof(response));
     vTaskDelay(pdMS_TO_TICKS(50));

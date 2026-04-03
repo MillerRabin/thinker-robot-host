@@ -8,9 +8,9 @@ private:
 public:
   Power() : voltage(0), current(0) {}
   Power(uint16_t voltage, uint16_t current) : voltage(voltage), current(current) {}
-  Power(float voltage, float current) : voltage(voltage * 1000), current(current * 1000) {}
-  float getVoltage() const { return voltage / 1000.0; }
-  float getCurrent() const { return current / 1000.0;    
+  Power(float voltage, float current) : voltage(voltage * 1000.0f), current(current * 1000.0f) {}
+  float getVoltage() const { return voltage / 1000.0f; }
+  float getCurrent() const { return current / 1000.0f;    
   }
   
   uint32_t serialize();
@@ -20,8 +20,8 @@ public:
     this->current = current;    
   }
   void set(float voltage, float current) {
-    this->voltage = voltage * 1000;
-    this->current = current * 1000;    
+    this->voltage = voltage * 1000.0f;
+    this->current = current * 1000.0f;
   }   
   float getPower() const { return getVoltage() * getCurrent(); }
 };

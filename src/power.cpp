@@ -8,6 +8,6 @@ uint32_t Power::serialize() {
 }
 
 void Power::deserialize(uint8_t data[4]) {
-  voltage = (data[0] << 8) | data[1];
-  current = (data[2] << 8) | data[3];
+  current = (static_cast<uint16_t>(data[1]) << 8) | data[0];
+  voltage = (static_cast<uint16_t>(data[3]) << 8) | data[2];
 }
