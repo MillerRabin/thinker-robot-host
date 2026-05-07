@@ -152,8 +152,7 @@ void TWAI::sendTask(void *instance) {
       for (uint i = 0; i < CAN_TX_BUFFER_SIZE; i++) {
         CanFrame frame = localFrames[i];
         if (frame.data_length_code != 0) {
-          transferSuccess =
-              twai->writeFrame(&frame, pdMS_TO_TICKS(CAN_SEND_WAIT_SEMAPHORE));
+          transferSuccess = twai->writeFrame(&frame, pdMS_TO_TICKS(CAN_SEND_WAIT_SEMAPHORE));
           if (!transferSuccess) {
             twai->errorCallback(frame, CAN_SEND_ERROR);
             if (!twai->isBusAlive()) {

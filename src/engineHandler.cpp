@@ -15,17 +15,23 @@ void sendStatus(AsyncWebServerRequest *request, const StatusResponse &response) 
 void socketLoop(void *parameters)
 {  
   while (true) {
-    ClientSocketResponse response;    
-    response.status = (uint64_t)Arm::status.canSendOK |
-                      (uint64_t)Arm::status.shoulderQuaternionOK << 1 |
-                      (uint64_t)Arm::status.elbowQuaternionOK << 2 |
-                      (uint64_t)Arm::status.wristQuaternionOK << 3 |
-                      (uint64_t)Arm::status.clawQuaternionOK << 4 |
-                      (uint64_t)Arm::status.clawRangeOK << 5 |
-                      (uint64_t)Arm::powerManagement.getEnginesStatus() << 6 |
-                      (uint64_t)Arm::powerManagement.getCameraStatus() << 7 |
-                      (uint64_t)Arm::powerManagement.getDetectorsStatus() << 8 |
-                      (uint64_t)Arm::powerManagement.getCPUPowerStatus() << 9;
+    ClientSocketResponse response;
+    response.status =
+        (uint64_t)Arm::status.canSendOK |
+        (uint64_t)Arm::status.shoulderQuaternionOK << 1 |
+        (uint64_t)Arm::status.elbowQuaternionOK << 2 |
+        (uint64_t)Arm::status.wristQuaternionOK << 3 |
+        (uint64_t)Arm::status.clawQuaternionOK << 4 |
+        (uint64_t)Arm::status.clawRangeOK << 5 |
+        (uint64_t)Arm::powerManagement.getEnginesStatus() << 6 |
+        (uint64_t)Arm::powerManagement.getCameraStatus() << 7 |
+        (uint64_t)Arm::powerManagement.getDetectorsStatus() << 8 |
+        (uint64_t)Arm::powerManagement.getCPUPowerStatus() << 9;
+
+    response.shoulder.status = Arm::status.shoulderStatuses;
+    response.elbow.status = Arm::status.elbowStatuses;
+    response.wrist.status = Arm::status.wristStatuses;
+    response.claw.status = Arm::status.clawStatuses;
 
     auto pdata = Arm::platform.imu.getLocalData();
     auto pquat = pdata.getQuaternion();    
