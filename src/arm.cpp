@@ -212,6 +212,51 @@ bool Arm::getBool(JsonObject jsonObj, const char *key, bool &result)
   return false;
 }
 
+bool Arm::getUseIMU(JsonObject jsonObj, const char *key, uint8_t &result)
+{
+  if (!jsonObj.containsKey(key))
+    return false;
+
+  JsonVariant value = jsonObj[key];
+  if (!value.is<const char *>())
+    return false;
+
+  const char *str = value.as<const char *>();
+  if (str == nullptr)
+    return false;
+
+  if (strcasecmp(str, "not-use") == 0) {
+    result = USE_IMU_NOT_USE;
+    return true;
+  }
+
+  if (strcasecmp(str, "use") == 0) {
+    result = USE_IMU_USE;
+    return true;
+  }
+
+  if (strcasecmp(str, "auto") == 0) {
+    result = USE_IMU_AUTO;
+    return true;
+  }
+
+  return false;
+}
+
+void Arm::setUseIMU(JsonObject data) {
+  uint8_t mode = USE_IMU_USE;
+  if (!getUseIMU(data, "useIMU", mode))
+    return;
+
+  ArmDataFrame frame{};
+  frame.values.param1 = mode;
+  frame.values.param2 = PARAMETER_IS_NAN;
+  frame.values.param3 = PARAMETER_IS_NAN;
+  frame.values.param4 = PARAMETER_IS_NAN;
+
+  twai.sendData(CAN_USE_IMU, frame.bytes);
+}
+
 void Arm::setPowerState(JsonObject data) {
   bool enginesEnabled = false;
   bool hasEngines = getBool(data, "enginesEnabled", enginesEnabled);
@@ -267,6 +312,7 @@ bool Arm::sendArmData(JsonObject data, const char *key1,
 
 void Arm::set(JsonObject data) {
   setPowerState(data);
+  setUseIMU(data);
 
   auto getAngle = [](float v) -> int16_t {
     if (isnan(v) || v < 0.0f || v > 270.0f) {

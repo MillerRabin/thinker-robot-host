@@ -48,7 +48,9 @@ class Arm {
     static void loop(void* parameters);
     static bool getFloat(JsonObject jsonObj, const char* key, float& result);
     static bool getBool(JsonObject jsonObj, const char* key, bool& result);
-    static void setPowerState(JsonObject data);   
+    static bool getUseIMU(JsonObject jsonObj, const char* key, uint8_t& result);
+    static void setPowerState(JsonObject data);
+    static void setUseIMU(JsonObject data);
     static bool sendArmData(JsonObject data, const char *key1,
                             int16_t (*parser1)(float), const char *key2,
                             int16_t (*parser2)(float), const char *key3,
