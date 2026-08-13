@@ -56,7 +56,8 @@ class Arm {
                             int16_t (*parser2)(float), const char *key3,
                             int16_t (*parser3)(float), const char *key4,
                             int16_t (*parser4)(float),
-                            const uint32_t canMessage);
+                            const uint32_t canMessage,
+                            const uint8_t triggerMask);
     public:
       static TWAI twai;
       static ArmStatus status;

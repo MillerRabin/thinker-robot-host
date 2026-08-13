@@ -284,7 +284,8 @@ bool Arm::sendArmData(JsonObject data, const char *key1,
                       int16_t (*parser1)(float), const char *key2,
                       int16_t (*parser2)(float), const char *key3,
                       int16_t (*parser3)(float), const char *key4,
-                      int16_t (*parser4)(float), const uint32_t canMessage) {
+                      int16_t (*parser4)(float), const uint32_t canMessage,
+                      const uint8_t triggerMask) {
   float val1 = NAN;
   bool hasVal1 = (key1 != nullptr && parser1 != nullptr) ? getFloat(data, key1, val1) : false;
 
@@ -297,7 +298,15 @@ bool Arm::sendArmData(JsonObject data, const char *key1,
   float val4 = NAN;
   bool hasVal4 = (key4 != nullptr && parser4 != nullptr) ? getFloat(data, key4, val4) : false;
 
-  if (!(hasVal1 || hasVal2 || hasVal3 || hasVal4)) {
+  // Only an actual joint-angle key (per triggerMask) may cause a frame to be sent - a shared,
+  // non-triggering key like "timeMS" being present for an unrelated action must not send that
+  // action's frame with NaN angles to a joint the caller never asked to move.
+  bool shouldSend =
+      ((triggerMask & 0x1) && hasVal1) ||
+      ((triggerMask & 0x2) && hasVal2) ||
+      ((triggerMask & 0x4) && hasVal3) ||
+      ((triggerMask & 0x8) && hasVal4);
+  if (!shouldSend) {
     return false;
   }
 
@@ -339,21 +348,24 @@ void Arm::set(JsonObject data) {
     Parser parser4;
     uint32_t canId;
     const char *name;
+    // Bit N set -> paramN+1 is a real joint-angle key that may trigger sending this action's
+    // frame. Keys not in the mask (e.g. "timeMS") only ever ride along, never trigger on their own.
+    uint8_t triggerMask;
   };
 
   Action actions[] = {
-      {"shoulder-y", getAngle, "shoulder-z", getAngle, "timeMS", getTime, nullptr, nullptr, CAN_SHOULDER_SET_YZ_DEGREE, "shoulder"},
-      {"elbow-y", getAngle, "timeMS", getTime, nullptr, nullptr, nullptr, nullptr, CAN_ELBOW_SET_Y_DEGREE, "elbow"},
-      {"wrist-y", getAngle, "wrist-z", getAngle, "timeMS", getTime, nullptr, nullptr, CAN_WRIST_SET_YZ_DEGREE, "wrist"},
-      {"claw-y", getAngle, "claw-x", getAngle, "claw-gripper", getAngle, "timeMS", getTime, CAN_CLAW_SET_XYG_DEGREE, "claw"},
+      {"shoulder-y", getAngle, "shoulder-z", getAngle, "timeMS", getTime, nullptr, nullptr, CAN_SHOULDER_SET_YZ_DEGREE, "shoulder", 0b0011},
+      {"elbow-y", getAngle, "timeMS", getTime, nullptr, nullptr, nullptr, nullptr, CAN_ELBOW_SET_Y_DEGREE, "elbow", 0b0001},
+      {"wrist-y", getAngle, "wrist-z", getAngle, "timeMS", getTime, nullptr, nullptr, CAN_WRIST_SET_YZ_DEGREE, "wrist", 0b0011},
+      {"claw-y", getAngle, "claw-x", getAngle, "claw-gripper", getAngle, "timeMS", getTime, CAN_CLAW_SET_XYG_DEGREE, "claw", 0b0111},
   };
 
   for (auto &action : actions) {
-    sendArmData(data, action.param1, action.parser1, 
-                      action.param2, action.parser2, 
-                      action.param3, action.parser3, 
-                      action.param4, action.parser4, 
-                      action.canId);
+    sendArmData(data, action.param1, action.parser1,
+                      action.param2, action.parser2,
+                      action.param3, action.parser3,
+                      action.param4, action.parser4,
+                      action.canId, action.triggerMask);
   }
 }
 
