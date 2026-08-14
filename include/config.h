@@ -87,7 +87,7 @@
 
 constexpr unsigned int CAN_RECEIVE_BUFFER_SIZE = 10;
 
-#define CAN_SEND_LOOP_WAIT 50
+#define CAN_SEND_LOOP_WAIT 10
 #define CAN_SEND_WAIT_SEMAPHORE 100
 #define CAN_REINIT_WAIT 1000
 
