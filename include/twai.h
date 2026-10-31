@@ -81,8 +81,10 @@ class TWAI {
         auto status = twai_receive(frame, timeout);
         if (status == ESP_OK)
           return true;
-        
-        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        // A timeout only means a quiet bus - back off only while the driver isn't installed
+        if (status != ESP_ERR_TIMEOUT)
+          vTaskDelay(pdMS_TO_TICKS(CAN_RECEIVE_WAIT_TIMEOUT));
         return false;
       }
 
