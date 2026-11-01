@@ -72,7 +72,7 @@ twai_status_t TWAI::begin(TwaiSpeed twaiSpeed) {
   }
 
   if (watchdogTaskHandle == NULL) {
-    if (xTaskCreatePinnedToCore(watchdogTask, "TWAI::watchdogTask", 2048, this,
+    if (xTaskCreatePinnedToCore(watchdogTask, "TWAI::watchdogTask", 4096, this,
                                 2, &watchdogTaskHandle, 1) != pdPASS) {
       printf("Failed to create TWAI::watchdogTask\n");
       end();
@@ -80,7 +80,7 @@ twai_status_t TWAI::begin(TwaiSpeed twaiSpeed) {
     }
   }
 
-  xTaskNotifyGive(initTaskHandle);
+  requestReinit();
   return TWAI_SUCCESS;
 }
 
@@ -88,32 +88,52 @@ void TWAI::receiveTask(void *instance) {
   TWAI *twai = static_cast<TWAI *>(instance);
   CanFrame frame;
   while (true) {
-    if (twai->readFrame(&frame, pdMS_TO_TICKS(100))) {
+    if (!twai->enterDriver()) {
+      vTaskDelay(pdMS_TO_TICKS(CAN_DRIVER_RETRY_WAIT));
+      continue;
+    }
+    // Short timeout: a reinstall waits for this call to return before it deletes the queue it blocks on
+    auto status = twai->readFrame(&frame, pdMS_TO_TICKS(CAN_RECEIVE_DRIVER_WAIT));
+    twai->leaveDriver();
+
+    if (status == ESP_OK) {
       if (twai->receiveBuffer.push(frame)) {
         xEventGroupSetBits(twai->events, TWAI_EVENT_RX);
       } else {
         printf("TWAI::receiveTask() receive buffer full, dropping frame\n");
       }
+    } else if (status != ESP_ERR_TIMEOUT) {
+      vTaskDelay(pdMS_TO_TICKS(CAN_DRIVER_RETRY_WAIT));
     }
   }
 }
 
+// Call only between enterDriver() and leaveDriver()
 bool TWAI::isBusAlive() {
   twai_status_info_t status;
 
   if (twai_get_status_info(&status) != ESP_OK)
     return false;
 
-  if (status.state == TWAI_STATE_BUS_OFF)
-    return false;
+  // BUS_OFF, RECOVERING and STOPPED all refuse twai_transmit()
+  return status.state == TWAI_STATE_RUNNING;
+}
 
-  if (status.state == TWAI_STATE_STOPPED) {
-    printf("Bus is stopped\n");
+// Every twai_* call goes between enterDriver() and leaveDriver(): init() uninstalls the driver only once
+// no task is inside it - deleting a queue a task is blocked on corrupts the heap.
+bool TWAI::enterDriver() {
+  if (reinitInProgress)
+    return false;
+  driverUsers++;
+  if (reinitInProgress) {
+    driverUsers--;
     return false;
   }
-    
-
   return true;
+}
+
+void TWAI::leaveDriver() {
+  driverUsers--;
 }
 
 void TWAI::initTask(void *instance) {
@@ -128,58 +148,89 @@ void TWAI::initTask(void *instance) {
 
 void TWAI::sendTask(void *instance) {
   TWAI *twai = static_cast<TWAI *>(instance);
-  CanFrame frame;  
   CanFrame localFrames[CAN_TX_BUFFER_SIZE];
   TickType_t lastWakeTime = xTaskGetTickCount();
-  
-  while (true) {
-    if (!twai->isBusAlive()) {
-      vTaskDelay(pdMS_TO_TICKS(CAN_REINIT_WAIT));
-      continue;
-    }
-    if (twai->reinitInProgress) {
-      vTaskDelay(pdMS_TO_TICKS(CAN_REINIT_WAIT));
-      continue;
-    }
 
-    if (xSemaphoreTake(twai->writeMutex, pdMS_TO_TICKS(CAN_SEND_WAIT_SEMAPHORE)) == pdTRUE) {
+  while (true) {
+    vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(CAN_SEND_LOOP_WAIT));
+
+    // While the driver is being reinstalled (tens of ms) keep polling at the send period instead of
+    // sleeping for seconds: sendBuffer holds the latest frame per id, so nothing stale piles up
+    // meanwhile, and every platform frame (the modules' heartbeat) resumes at once.
+    if (!twai->enterDriver())
+      continue;
+
+    if (twai->isBusAlive() &&
+        xSemaphoreTake(twai->writeMutex, pdMS_TO_TICKS(CAN_SEND_WAIT_SEMAPHORE)) == pdTRUE) {
       memcpy(localFrames, twai->sendBuffer, sizeof(localFrames));
       memset(twai->sendBuffer, 0, sizeof(twai->sendBuffer));
       xSemaphoreGive(twai->writeMutex);
 
-      bool transferSuccess = false;
-
       for (uint i = 0; i < CAN_TX_BUFFER_SIZE; i++) {
         CanFrame frame = localFrames[i];
-        if (frame.data_length_code != 0) {
-          transferSuccess = twai->writeFrame(&frame, pdMS_TO_TICKS(CAN_SEND_WAIT_SEMAPHORE));
-          if (!transferSuccess) {
-            twai->errorCallback(frame, CAN_SEND_ERROR);
-            if (!twai->isBusAlive()) {
-              printf("TWAI bus is not alive. Attempting to reinitialize from "
-                     "SendTask\n");
-              twai->requestReinit();
-              break;
-            }
-          } else {
-            twai->errorCallback(frame, CAN_SUCCESS);
-          }
-        }
+        if (frame.data_length_code == 0)
+          continue;
+        // Never block on a full TX queue: waiting 100 ms per frame stalls every other id behind it,
+        // and the frame is superseded by the next period's value anyway.
+        twai->errorCallback(frame, twai->writeFrame(&frame, 0) ? CAN_SUCCESS : CAN_SEND_ERROR);
       }
     }
-    vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(CAN_SEND_LOOP_WAIT));
+    twai->leaveDriver();
   }  
 }
 
+// Bus-off is cleared by reinstalling the driver, the path this code has always used: in-place
+// twai_initiate_recovery() crashed the IDF 4.4 driver on its first use here (assert tx_msg_count >= 0
+// in the TX ISR, 2026-10-31). This ESP32 is the only node on the bus with CAN fault confinement
+// (can2040 never goes bus-off), so it is the one that drops off when noise hits its frames - and all
+// platform frames, the modules' heartbeat, stop until it is back.
 void TWAI::watchdogTask(void *instance) {
   TWAI *twai = static_cast<TWAI *>(instance);
+  uint32_t busOffCount = 0;
+  uint32_t reportedBusErrors = 0;
+  uint32_t maxTec = 0;
+  TickType_t lastReport = 0;
+  TickType_t lastReinit = 0;
   while (true) {
-    if (!twai->isBusAlive()) {
-      printf("TWAI bus is not alive. Attempting to reinitialize from "
-             "Watchdog\n");
-      twai->requestReinit();
+    vTaskDelay(pdMS_TO_TICKS(CAN_WATCHDOG_WAIT));
+    if (!twai->enterDriver())
+      continue;
+    twai_status_info_t status;
+    bool installed = twai_get_status_info(&status) == ESP_OK;
+    twai->leaveDriver();
+
+    TickType_t now = xTaskGetTickCount();
+    if (!installed) {
+      // Only a failed init() leaves the driver uninstalled - retry, but not in a tight loop
+      if (now - lastReinit >= pdMS_TO_TICKS(CAN_REINIT_WAIT)) {
+        lastReinit = now;
+        twai->requestReinit();
+      }
+      continue;
     }
-    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    if (status.state != TWAI_STATE_RUNNING) {
+      busOffCount++;
+      printf("TWAI bus-off #%lu (state %d, bus errors %lu, TEC %lu), reinstalling\n",
+             (unsigned long)busOffCount, status.state, (unsigned long)status.bus_error_count,
+             (unsigned long)status.tx_error_counter);
+      lastReinit = now;
+      twai->requestReinit();
+      continue;
+    }
+
+    if (status.tx_error_counter > maxTec)
+      maxTec = status.tx_error_counter;
+    if (status.bus_error_count != reportedBusErrors &&
+        now - lastReport >= pdMS_TO_TICKS(CAN_ERROR_REPORT_INTERVAL)) {
+      printf("TWAI bus errors %lu, tx failed %lu, rx missed %lu, TEC %lu (max %lu), REC %lu\n",
+             (unsigned long)status.bus_error_count, (unsigned long)status.tx_failed_count,
+             (unsigned long)status.rx_missed_count, (unsigned long)status.tx_error_counter,
+             (unsigned long)maxTec, (unsigned long)status.rx_error_counter);
+      reportedBusErrors = status.bus_error_count;
+      maxTec = 0;
+      lastReport = now;
+    }
   }
 }
 
@@ -214,7 +265,10 @@ twai_status_t TWAI::end() {
 }
 
 twai_status_t TWAI::init() {
+  TickType_t started = xTaskGetTickCount();
   reinitInProgress = true;
+  while (driverUsers > 0)
+    vTaskDelay(1);
 
   twai_status_t cStatus = end();
   vTaskDelay(pdMS_TO_TICKS(50));
@@ -222,6 +276,7 @@ twai_status_t TWAI::init() {
                  cStatus == TWAI_UNISTALL_FAILED;
   if (!success) {
     printf("Failed to end driver, status: %d\n", cStatus);
+    reinitInProgress = false;
     return cStatus;
   }
 
@@ -252,23 +307,25 @@ twai_status_t TWAI::init() {
   if (!iSuccess) {
     printf("Failed to install driver\n");
     end();
+    reinitInProgress = false;
     return TWAI_INSTALL_FAILED;
   }
 
   if (twai_start() != ESP_OK) {
     printf("Failed to start driver\n");
     end();
+    reinitInProgress = false;
     return TWAI_START_FAILED;
   }
 
-  printf("TWAI initialized successfully with speed %d\n", speed);
+  printf("TWAI initialized successfully with speed %d in %lu ms\n", speed,
+         (unsigned long)((xTaskGetTickCount() - started) * portTICK_PERIOD_MS));
   reinitInProgress = false;
   return TWAI_SUCCESS;
 }
 
 void TWAI::requestReinit() {
-  if (!reinitInProgress) {
-    reinitInProgress = true;
+  if (!reinitInProgress.exchange(true)) {
     xEventGroupSetBits(events, TWAI_EVENT_REINIT);
   }
 }

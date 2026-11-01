@@ -12,21 +12,36 @@ void sendStatus(AsyncWebServerRequest *request, const StatusResponse &response) 
   request->send(resp);
 }
 
+uint64_t platformStatus() {
+  return (uint64_t)Arm::status.canSendOK |
+         (uint64_t)Arm::status.shoulderQuaternionOK << 1 |
+         (uint64_t)Arm::status.elbowQuaternionOK << 2 |
+         (uint64_t)Arm::status.wristQuaternionOK << 3 |
+         (uint64_t)Arm::status.clawQuaternionOK << 4 |
+         (uint64_t)Arm::status.clawRangeOK << 5 |
+         (uint64_t)Arm::powerManagement.getEnginesStatus() << 6 |
+         (uint64_t)Arm::powerManagement.getCameraStatus() << 7 |
+         (uint64_t)Arm::powerManagement.getDetectorsStatus() << 8 |
+         (uint64_t)Arm::powerManagement.getCPUPowerStatus() << 9;
+}
+
+// CAN_PLATFORM_STATUS carries ENGINES_ON to the modules - kept out of socketLoop, which runs at idle
+// priority and waits on lwIP inside binaryAll(), so a slow WebSocket can't delay it.
+void statusLoop(void *parameters)
+{
+  TickType_t lastWakeTime = xTaskGetTickCount();
+  while (true) {
+    uint64_t status = platformStatus();
+    Arm::twai.sendData(CAN_PLATFORM_STATUS, (uint8_t *)&status);
+    vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(50));
+  }
+}
+
 void socketLoop(void *parameters)
 {  
   while (true) {
     ClientSocketResponse response;
-    response.status =
-        (uint64_t)Arm::status.canSendOK |
-        (uint64_t)Arm::status.shoulderQuaternionOK << 1 |
-        (uint64_t)Arm::status.elbowQuaternionOK << 2 |
-        (uint64_t)Arm::status.wristQuaternionOK << 3 |
-        (uint64_t)Arm::status.clawQuaternionOK << 4 |
-        (uint64_t)Arm::status.clawRangeOK << 5 |
-        (uint64_t)Arm::powerManagement.getEnginesStatus() << 6 |
-        (uint64_t)Arm::powerManagement.getCameraStatus() << 7 |
-        (uint64_t)Arm::powerManagement.getDetectorsStatus() << 8 |
-        (uint64_t)Arm::powerManagement.getCPUPowerStatus() << 9;
+    response.status = platformStatus();
 
     response.shoulder.status = Arm::status.shoulderStatuses;
     response.elbow.status = Arm::status.elbowStatuses;
@@ -86,9 +101,6 @@ void socketLoop(void *parameters)
     response.claw.gyroscope = cgyro.serialize();        
     response.claw.range = Arm::claw.range.serialize();
     response.claw.barometer = Arm::claw.barometer.serialize();    
-    uint8_t st[8];
-    memcpy(st, &response.status, sizeof(response.status));
-    Arm::twai.sendData(CAN_PLATFORM_STATUS, st);
     WebSocket.binaryAll(reinterpret_cast<uint8_t *>(&response), sizeof(response));
     vTaskDelay(pdMS_TO_TICKS(50));
   }
@@ -170,6 +182,10 @@ void enableEngineHandler() {
   auto sockerTaskResult = xTaskCreate(socketLoop, "EngineHandler::socketLoop", 4096, NULL, tskIDLE_PRIORITY, &WebSocketTaskHandle);
   if (sockerTaskResult != pdPASS) {
     Serial.println("WebSocket task creation failed!");
+  }
+
+  if (xTaskCreate(statusLoop, "EngineHandler::statusLoop", 2048, NULL, 4, NULL) != pdPASS) {
+    Serial.println("Status task creation failed!");
   }
 }
 

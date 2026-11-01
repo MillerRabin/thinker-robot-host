@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <atomic>
 #include "config.h"
 #include "driver/twai.h"
 #include "canRingBuffer.h"
@@ -65,25 +66,25 @@ class TWAI {
     static void initTask(void *instance);
     static void watchdogTask(void *instance);
     twai_status_t end();
-    volatile bool reinitInProgress = false;
+    std::atomic<bool> reinitInProgress{false};
+    // Tasks currently inside a driver call - init() waits for 0 before uninstalling
+    std::atomic<int> driverUsers{0};
     SemaphoreHandle_t writeMutex = NULL;
     public:
       void requestReinit();
       twai_status_t init();
+      bool enterDriver();
+      void leaveDriver();
       CanRingBuffer receiveBuffer;
       CanFrame sendBuffer[CAN_TX_BUFFER_SIZE];
       EventGroupHandle_t events = NULL;
       bool isBusAlive();
-      inline bool IRAM_ATTR readFrame(CanFrame *frame, TickType_t timeout = portMAX_DELAY) {
+      // ESP_ERR_TIMEOUT means a quiet bus; any other error means the driver isn't installed
+      inline esp_err_t IRAM_ATTR readFrame(CanFrame *frame, TickType_t timeout = portMAX_DELAY) {
         if (!frame)
-          return false;
+          return ESP_ERR_INVALID_ARG;
 
-        auto status = twai_receive(frame, timeout);
-        if (status == ESP_OK)
-          return true;
-        
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        return false;
+        return twai_receive(frame, timeout);
       }
 
       inline bool IRAM_ATTR writeFrame(CanFrame *frame, TickType_t timeout = portMAX_DELAY) {
