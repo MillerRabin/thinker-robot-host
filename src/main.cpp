@@ -39,6 +39,7 @@ void enableVersion() {
     AsyncResponseStream *response = request->beginResponseStream("application/json");
     DynamicJsonDocument doc(256);
     doc["version"] = appVersion;
+    doc["build"] = BUILD_REV;
     doc["chipModel"] = ESP.getChipModel();
     doc["free-heap"] = ESP.getFreeHeap();
     doc["cores"] = ESP.getChipCores();

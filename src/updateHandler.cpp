@@ -1,6 +1,7 @@
 #include <Update.h>
 #include <ESPAsyncWebServer.h>
 #include "updateHandler.h"
+#include "powerManagement.h"
 
 bool shouldReboot = false;
 
@@ -18,6 +19,12 @@ void enableUpdate() {
   },[](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
     if(!index){
       Serial.printf("Update Start: %s\n", filename.c_str());
+      // The reboot at the end cuts the engines anyway - cut them now, not mid-move.
+      PowerManagement::disableEngines();
+      // An upload at full speed keeps the TCP/IP task busy on core 0 while the flash is written, and
+      // core 0's idle task starved: task_wdt aborted 5 s in and rebooted the host (2026-11-06) - curl
+      // got "connection reset" and only a ~14 KB/s upload got through. The reboot below re-arms it.
+      disableCore0WDT();
 
       if(!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000)){
         Update.printError(Serial);
@@ -33,6 +40,7 @@ void enableUpdate() {
         Serial.printf("Update Success: %uB\n", index+len);
       } else {
         Update.printError(Serial);
+        enableCore0WDT();
       }
     }
   });

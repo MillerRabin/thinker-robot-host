@@ -87,7 +87,17 @@ twai_status_t TWAI::begin(TwaiSpeed twaiSpeed) {
 void TWAI::receiveTask(void *instance) {
   TWAI *twai = static_cast<TWAI *>(instance);
   CanFrame frame;
+  uint32_t dropped = 0;
+  uint32_t lastDropLog = 0;
   while (true) {
+    // A line per dropped frame, at the ~3600 frames/s the modules send, kept this task printing and
+    // starved the web server while an OTA upload stalled the frame consumer: task_wdt fired on
+    // async_tcp (2026-11-06). Count them and report once a second instead.
+    if (dropped > 0 && millis() - lastDropLog >= 1000) {
+      printf("TWAI::receiveTask() receive buffer full, dropped %lu frames\n", (unsigned long)dropped);
+      dropped = 0;
+      lastDropLog = millis();
+    }
     if (!twai->enterDriver()) {
       vTaskDelay(pdMS_TO_TICKS(CAN_DRIVER_RETRY_WAIT));
       continue;
@@ -100,7 +110,7 @@ void TWAI::receiveTask(void *instance) {
       if (twai->receiveBuffer.push(frame)) {
         xEventGroupSetBits(twai->events, TWAI_EVENT_RX);
       } else {
-        printf("TWAI::receiveTask() receive buffer full, dropping frame\n");
+        dropped++;
       }
     } else if (status != ESP_ERR_TIMEOUT) {
       vTaskDelay(pdMS_TO_TICKS(CAN_DRIVER_RETRY_WAIT));
