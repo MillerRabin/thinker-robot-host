@@ -41,13 +41,17 @@ echo
 
 echo -e "${BLUE}📤 Uploading firmware${RATE:+ at $RATE/s}...${NC}"
 RESPONSE="$(curl -F "update=@$BIN_FILE" "http://$HOST/update" -m 300 --silent ${RATE:+--limit-rate "$RATE"})"
-if [ "$RESPONSE" != "OK" ]; then
-    # The same build would still answer below if the host rebooted mid-upload.
-    echo -e "${RED}❌ Upload failed (host answered: ${RESPONSE:-nothing})${NC}"
+if [ "$RESPONSE" = "OK" ]; then
+    echo -e "${GREEN}✅ Upload accepted${NC}"
+elif [ -z "$RESPONSE" ]; then
+    # It can reboot into the new image before its "OK" gets out (2026-11-06) - the build check below
+    # tells; a host that reset mid-upload comes back with the old build and fails it.
+    echo -e "${YELLOW}⚠️  No answer to the upload - checking which build comes back${NC}"
+else
+    echo -e "${RED}❌ Upload failed (host answered: $RESPONSE)${NC}"
     echo "   An older host firmware resets on a full-speed upload - retry with RATE=14k."
     exit 1
 fi
-echo -e "${GREEN}✅ Upload accepted${NC}"
 
 echo -e "${BLUE}⏳ Waiting for the host to come back...${NC}"
 for i in $(seq 1 60); do

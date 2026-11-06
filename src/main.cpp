@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <esp_system.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
@@ -34,10 +35,29 @@ bool enableWIFI() {
   return true;
 }
 
+// Why the host last restarted - an unexplained engines-off on 2026-11-06 (the modules saw a CAN
+// glitch, then no platform status) looked like a reboot, and nothing could tell without opening the
+// serial port, which resets it.
+static const char *resetReasonName(esp_reset_reason_t reason) {
+  switch (reason) {
+    case ESP_RST_POWERON: return "power-on";
+    case ESP_RST_EXT: return "external pin";
+    case ESP_RST_SW: return "software";
+    case ESP_RST_PANIC: return "panic";
+    case ESP_RST_INT_WDT: return "interrupt watchdog";
+    case ESP_RST_TASK_WDT: return "task watchdog";
+    case ESP_RST_WDT: return "other watchdog";
+    case ESP_RST_DEEPSLEEP: return "deep sleep";
+    case ESP_RST_BROWNOUT: return "brownout";
+    case ESP_RST_SDIO: return "sdio";
+    default: return "unknown";
+  }
+}
+
 void enableVersion() {
   Server.on("/version", HTTP_POST, [](AsyncWebServerRequest *request) {
     AsyncResponseStream *response = request->beginResponseStream("application/json");
-    DynamicJsonDocument doc(256);
+    DynamicJsonDocument doc(384);
     doc["version"] = appVersion;
     doc["build"] = BUILD_REV;
     doc["chipModel"] = ESP.getChipModel();
@@ -45,6 +65,8 @@ void enableVersion() {
     doc["cores"] = ESP.getChipCores();
     doc["frequencyMHz"] = ESP.getCpuFreqMHz();
     doc["flashChipSize"] = ESP.getFlashChipSize();
+    doc["uptimeSec"] = millis() / 1000;
+    doc["resetReason"] = resetReasonName(esp_reset_reason());
 
     serializeJson(doc, *response);
     request->send(response); 
