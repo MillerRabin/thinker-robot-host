@@ -9,6 +9,7 @@
 #include "credentials.h"
 #include "updateHandler.h"
 #include "engineHandler.h"
+#include "motion.h"
 #include "server.h"
 #include "config.h"
 
@@ -87,6 +88,7 @@ void setup(){
   enableUpdate();  
   serverBegin();
   enableEngineHandler();
+  Motion::begin();
 }
 
 void loop() {
