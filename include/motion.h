@@ -18,6 +18,10 @@ struct Request {
   float roll;        // the jaws' line on the table, deg from +x
   uint32_t timeMS;   // how long the move takes
   bool line;         // the tip along a straight line; else the joints all at once (a free path)
+  // The share of the time spent braking (0.5..0.85); NaN = a minimum-jerk curve (brakes as hard as
+  // it starts). A longer, gentler stop for the arm's ~4 Hz swing, which is worst while braking
+  // (2026-11-12).
+  float brake;
   // Instead of a claw target: joint angles (deg from the calibration pose, kin::Joint order, NaN =
   // stay), always a joint path. The way back to vertical (all 0): a module's own planned move keeps
   // the command-vs-IMU offset it starts with, which holds its parent's tilt and its gravity sag, so

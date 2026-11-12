@@ -48,6 +48,23 @@ Q toQ(const Quaternion &q) { return {q.real, q.i, q.j, q.k}; }
 
 float minJerk(float t) { return t * t * t * (10.0f + t * (-15.0f + 6.0f * t)); }
 
+// Progress 0..1 at time t (0..1): a minimum-jerk curve, or with brake (the share of the time spent
+// slowing down) a speed that rises over 1 - brake and falls over brake, each along a smoothstep - zero
+// acceleration at the start, the peak and the end. Peak speed 2, deceleration 3 / brake (min-jerk:
+// 1.875 and 5.77); acceleration 3 / (1 - brake).
+float profile(float t, float brake) {
+  if (std::isnan(brake)) {
+    return minJerk(t);
+  }
+  auto area = [](float x) { return x * x * x - 0.5f * x * x * x * x; };  // integral of 3x^2 - 2x^3
+  const float rise = 1.0f - brake;
+  if (t <= rise) {
+    return 2.0f * rise * area(t / rise);
+  }
+  const float x = (t - rise) / brake;
+  return std::min(1.0f, rise + 2.0f * (t - rise) - 2.0f * brake * area(x));
+}
+
 int16_t angle10(float deg) { return std::isnan(deg) ? (int16_t)PARAMETER_IS_NAN : (int16_t)lroundf(deg * 10.0f); }
 
 // One waypoint to every module: the same set frames as /set (ArmDataFrame, angles x10), with a stream
@@ -206,7 +223,7 @@ bool start(const Request &q, JsonObject reply) {
   commands(a0, homes, prevCmd);
   float topSpeed = 0;
   for (int k = 1; k <= n; k++) {
-    const float s = minJerk(k / (float)n);
+    const float s = profile(k / (float)n, q.brake);
     float a[N];
     if (q.line && !q.jointTarget) {
       // The tip along the line, the claw turning from where it points now to the goal's direction (the
@@ -284,9 +301,10 @@ void begin() {
     Server.on(path, HTTP_OPTIONS, [](AsyncWebServerRequest *request) { request->send(200); });
   }
   // {"x", "y", "z", "pitch", "azimuth" (default: toward the point), "roll" (optional), "timeMS",
-  //  "path": "line" | "joint"}, or instead of the claw target {"home": true} (every joint but claw-x
-  //  to its calibration pose - the arm vertical) or {"angles": {"elbow-y": deg, ...}} (joint angles
-  //  from the calibration pose, the joints not named stay) - both a joint path.
+  //  "path": "line" | "joint", "brake" (the share of the time spent braking, 0.5..0.85, optional)},
+  //  or instead of the claw target {"home": true} (every joint but claw-x to its calibration pose -
+  //  the arm vertical) or {"angles": {"elbow-y": deg, ...}} (joint angles from the calibration pose,
+  //  the joints not named stay) - both a joint path, both taking "timeMS" and "brake" too.
   auto *move = new AsyncCallbackJsonWebHandler("/move", [](AsyncWebServerRequest *request, JsonVariant json) {
     DynamicJsonDocument doc(512);
     JsonObject reply = doc.to<JsonObject>();
@@ -308,6 +326,11 @@ void begin() {
       }
       getFloat(in, "timeMS", timeMS);
       q.timeMS = (uint32_t)std::max(200.0f, timeMS);
+      if (!getFloat(in, "brake", q.brake)) {
+        q.brake = NAN;
+      } else {
+        q.brake = std::min(0.85f, std::max(0.5f, q.brake));
+      }
       const uint32_t t0 = millis();
       start(q, reply);
       reply["planMs"] = millis() - t0;
@@ -321,6 +344,11 @@ void begin() {
       q.hasRoll = getFloat(in, "roll", q.roll);
       getFloat(in, "timeMS", timeMS);
       q.timeMS = (uint32_t)std::max(200.0f, timeMS);
+      if (!getFloat(in, "brake", q.brake)) {
+        q.brake = NAN;
+      } else {
+        q.brake = std::min(0.85f, std::max(0.5f, q.brake));
+      }
       q.line = !(in.containsKey("path") && String(in["path"].as<const char *>()) == "joint");
       const uint32_t t0 = millis();
       start(q, reply);
