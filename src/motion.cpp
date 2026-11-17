@@ -21,6 +21,10 @@ constexpr uint64_t STATUS_CALIBRATED = 0x100;
 // The module's IMU-held Y joint is calming after a stream, its command held (the modules'
 // ARM_STREAM_WAITING).
 constexpr uint64_t STATUS_STREAM_WAITING = 0x800;
+// A module's IMU was reset with the engines on and it holds still while it re-anchors (the modules'
+// ARM_IMU_RECOVERING): the running move stops - the rest of its waypoints would land on a joint that
+// isn't following them.
+constexpr uint64_t STATUS_IMU_RECOVERING = 0x2000;
 constexpr float SHOULDER_Z_HOME = 135.0f;   // shoulder-z's home never changes
 constexpr float DEG = 3.14159265358979f / 180.0f;
 
@@ -153,9 +157,14 @@ void streamTask(void *) {
     float c[N];
     bool send = false;
     bool learn = false;
+    const bool recovering = ((Arm::status.shoulderStatuses | Arm::status.elbowStatuses |
+                              Arm::status.wristStatuses) & STATUS_IMU_RECOVERING) != 0;
     portENTER_CRITICAL(&planLock);
     if (planActive) {
-      if (!PowerManagement::getEnginesStatus() || planNext >= planCount) {
+      if (!PowerManagement::getEnginesStatus() || recovering) {
+        planActive = false;
+        learnPending = false;
+      } else if (planNext >= planCount) {
         planActive = false;
       } else {
         std::copy(plan[planNext], plan[planNext] + N, c);

@@ -20,15 +20,19 @@ struct Name {
 };
 const Name JOINTS[] = {{"shoulder-y", 1}, {"shoulder-z", 2}, {"elbow-y", 3}, {"wrist-y", 4}, {"wrist-z", 5}};
 constexpr int JOINT_IDS = 6;   // 1..5
-constexpr int PARAM_IDS = 18;  // 1..17
+constexpr int PARAM_IDS = 32;  // 1..31: room for parameters to come without changing the saved size
+constexpr int PARAM_IDS_V1 = 18;  // the first saved profiles (2026-11-17, parameters 1..17)
 Module moduleOf(int joint) { return joint <= 2 ? SHOULDER : joint == 3 ? ELBOW : WRIST; }
 const Name PARAMS[] = {
     {"dampingGain", 1},      {"dampingMax", 2},       {"dampingDeadband", 3}, {"dampingRateTau", 4},
     {"ditherDeg", 5},        {"ditherHalfPeriodMs", 6}, {"streamGain", 7},    {"streamErrorTau", 8},
     {"settleTolerance", 9},  {"settleSpeed", 10},     {"calmSpan", 11},       {"calmBlockMs", 12},
     {"calmWaitMaxMs", 13},   {"holdWakeDeg", 14},     {"holdWakeMs", 15},     {"holdWakeNowDeg", 16},
-    {"parentWait", 17},
+    {"parentWait", 17},      {"parentFollow", 18},    {"entrySec", 19},       {"correctionMax", 20},
+    {"resetIMU", 21},
 };
+// Parameters that are actions, not settings: never kept in the profile (resent at a module's boot).
+bool isAction(int param) { return param == 21; }
 // A module answers every request on its own *_TUNED id, but its send buffer keeps only the latest frame
 // per id - so one request at a time, each waiting for its answer.
 constexpr uint32_t REPLY_TIMEOUT_MS = 100;
@@ -82,8 +86,15 @@ void loadProfile() {
     for (float &v : row) v = NAN;
   }
   if (prefs.begin("tune", true)) {
-    if (prefs.getBytesLength("profile") == sizeof(profile)) {
+    const size_t len = prefs.getBytesLength("profile");
+    if (len == sizeof(profile)) {
       prefs.getBytes("profile", profile, sizeof(profile));
+    } else if (len == sizeof(float) * JOINT_IDS * PARAM_IDS_V1) {
+      float old[JOINT_IDS][PARAM_IDS_V1];
+      prefs.getBytes("profile", old, sizeof(old));
+      for (int j = 0; j < JOINT_IDS; j++) {
+        for (int q = 0; q < PARAM_IDS_V1; q++) profile[j][q] = old[j][q];
+      }
     }
     prefs.end();
   }
@@ -199,7 +210,7 @@ void begin() {
           } else if (!ask((uint8_t)joint, (uint8_t)param, true, kv.value().as<float>(), out)) {
             errors.add(String("no answer setting ") + kv.key().c_str());
             ok = false;
-          } else {
+          } else if (!isAction(param)) {
             profile[joint][param] = out;  // as the module clamped it
           }
         }
@@ -207,6 +218,7 @@ void begin() {
       JsonObject values = reply.createNestedObject("values");
       for (const Name &p : PARAMS) {
         float out = NAN;
+        if (isAction(p.id)) continue;
         if (ask((uint8_t)joint, p.id, false, NAN, out)) {
           if (!std::isnan(out)) values[p.name] = out;
         } else {
