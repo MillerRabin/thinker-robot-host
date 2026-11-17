@@ -37,6 +37,9 @@
 #define CAN_CLAW_FIRMWARE_UPGRADE 0x08
 #define CAN_TARE 0x09
 #define CAN_USE_IMU 0x0A
+// Runtime tuning of the modules (see src/tune.cpp; the modules' common/tuning/tuning.h has the frame
+// layout and the TUNE_* numbers - change both together).
+#define CAN_TUNE 0x0B
 
 #define USE_IMU_NOT_USE 0
 #define USE_IMU_USE 1
@@ -56,6 +59,7 @@
 #define CAN_SHOULDER_GYROSCOPE 0x22
 #define CAN_SHOULDER_ACCURACY 0x23
 #define CAN_SHOULDER_STATUSES 0x24
+#define CAN_SHOULDER_TUNED 0x25
 #define CAN_SHOULDER_FIRMWARE_UPGRADE_CONFIRMED 0x28
 
 #define CAN_ELBOW_QUATERNION 0x30
@@ -63,6 +67,7 @@
 #define CAN_ELBOW_GYROSCOPE 0x32
 #define CAN_ELBOW_ACCURACY 0x33
 #define CAN_ELBOW_STATUSES 0x34
+#define CAN_ELBOW_TUNED 0x35
 #define CAN_ELBOW_FIRMWARE_UPGRADE_CONFIRMED 0x38
 
 #define CAN_WRIST_QUATERNION 0x40
@@ -70,6 +75,7 @@
 #define CAN_WRIST_GYROSCOPE 0x42
 #define CAN_WRIST_ACCURACY 0x43
 #define CAN_WRIST_STATUSES 0x44
+#define CAN_WRIST_TUNED 0x45
 #define CAN_WRIST_FIRMWARE_UPGRADE_CONFIRMED 0x48
 
 #define CAN_CLAW_QUATERNION 0x50

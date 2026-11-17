@@ -18,6 +18,9 @@ constexpr uint16_t STEP_TIME_MS = 60;       // its timeMS: over the interval (a 
 constexpr int MAX_POINTS = 400;             // 16 s
 constexpr float MAX_JOINT_SPEED = 60.0f;    // deg/s of any command between waypoints
 constexpr uint64_t STATUS_CALIBRATED = 0x100;
+// The module's IMU-held Y joint is calming after a stream, its command held (the modules'
+// ARM_STREAM_WAITING).
+constexpr uint64_t STATUS_STREAM_WAITING = 0x800;
 constexpr float SHOULDER_Z_HOME = 135.0f;   // shoulder-z's home never changes
 constexpr float DEG = 3.14159265358979f / 180.0f;
 
@@ -38,6 +41,55 @@ volatile bool planActive = false;
 portMUX_TYPE planLock = portMUX_INITIALIZER_UNLOCKED;
 // claw-x runs open-loop and isn't published: the last command this module sent it, NaN = never.
 float lastClawX = NAN;
+
+// End-of-move overshoot, learned per joint and direction ([0] toward growing angles, [1] falling) in
+// joint angles, deg: how far each joint ran past its goal once the move ended (+ = toward growing
+// angles). Sent with every waypoint, so the module ends that joint's setpoint short by it (see the
+// modules' Servo::setStreamEndShift()). Measured live (2026-11-11/12): braking, a link rolls across its
+// backlash 1-4.5deg past where the command stops; each module learning it from the absolute angle it
+// holds took its parent's overrun for its own - the wrist's shift flipped sign move to move.
+// Taken as the mean over the time all three modules hold their commands while their links calm (the
+// modules' Servo::streamWaitTick(), 0.5-3 s), up to the first one starting to settle - which moves
+// its children's joint angles. Measured live (2026-11-13), a single reading 300 ms after the last
+// waypoint landed on a random phase of the ~2 s swing at the top of a move back to vertical: the
+// shift never converged and the bigger it got, the further past vertical it drove the arm.
+// The rate: at 0.7 (2026-11-17) the shifts chased each move's own scatter - a joint's end varies by
+// ~+-0.5deg move to move, the shoulder's carrying into the elbow's and the wrist's joint angles - the
+// elbow's shift back up went 1.46, 1.20, 0.55 in three moves.
+constexpr float LEARN_RATE = 0.4f;
+constexpr float LEARN_MIN_TRAVEL_DEG = 4.0f;
+constexpr float LEARN_MAX_DEG = 6.0f;
+constexpr uint32_t LEARN_START_MS = 1500;  // after the last waypoint, the modules have long reported
+                                           // waiting, or never will (old firmware)
+constexpr uint32_t LEARN_MAX_MS = 5000;    // a window still open this long ends anyway
+constexpr int LEARN_MIN_SAMPLES = 5;       // INTERVAL_MS each
+const int LEARN_JOINTS[] = {SHOULDER_Y, ELBOW_Y, WRIST_Y};
+float learned[N][2] = {};
+// The parking pose ({"home": true}): the calibration pose with the forearm and the claw bent forward
+// this far, so every Y joint carries a share of the weight beyond it and its gears stay pressed to
+// one side. Measured live (2026-11-17): stopping at vertical, the links rolled across their backlash
+// as the load changed sides - in the last 1.5 s of a move back up the elbow swung -4..+6deg about its
+// setpoint and the wrist +-7, where the arm stopped depended on the phase of that swing (2 of 4 moves
+// stopped 2-4deg short, the settle then threw the tip from +69 to -79 mm), and no learned shift could
+// fix it. The whole arm leaned 4.5deg forward still left the elbow and the wrist nearly unloaded: one
+// move stopped with the wrist 7.5deg short and its settle took the tip 99 mm. Bent 15+15 the joints
+// calmed within 0.5 s of the stop and the tip ended within 9 mm of the target, without learning.
+constexpr float PARK_ELBOW_DEG = 15.0f;
+constexpr float PARK_WRIST_DEG = 15.0f;
+float lastOverrun[N] = {NAN, NAN, NAN, NAN, NAN, NAN, NAN};
+const char *learnWhy = nullptr;  // why the last move taught nothing
+// The window: joint angles summed while all three modules report waiting.
+double learnSum[N] = {};
+int learnSamples = 0;
+int lastLearnSamples = 0;
+bool learnWindowOpen = false;
+// The running move's: the shift each joint gets, its goal (rad) and which way it travels (-1: not
+// learned this move). Written by start() under the lock with the plan.
+float planShift[N] = {};
+float planGoal[N] = {};
+int planWay[N] = {-1, -1, -1, -1, -1, -1, -1};
+volatile bool learnPending = false;
+TickType_t lastPointAt = 0;
 
 float slot(uint64_t status, int shift) {
   const uint16_t raw = (status >> shift) & 0xFFFF;
@@ -67,15 +119,23 @@ float profile(float t, float brake) {
 
 int16_t angle10(float deg) { return std::isnan(deg) ? (int16_t)PARAMETER_IS_NAN : (int16_t)lroundf(deg * 10.0f); }
 
+// A shift in 0.01deg; -0.01 would read as the NaN marker, so it goes as 0.
+int16_t shift100(float deg) {
+  const long v = lroundf(deg * 100.0f);
+  return (int16_t)((v == -1) ? 0 : std::max(-30000L, std::min(30000L, v)));
+}
+
 // One waypoint to every module: the same set frames as /set (ArmDataFrame, angles x10), with a stream
 // timeMS.
 void sendWaypoint(const float c[N]) {
   ArmDataFrame f{};
-  f.values = {angle10(c[SHOULDER_Y]), angle10(c[SHOULDER_Z]), (int16_t)STEP_TIME_MS, (int16_t)PARAMETER_IS_NAN};
+  // The modules' joint angles add up along the arm with the same sign as theirs, so a joint's overrun
+  // in joint angles is its module's too.
+  f.values = {angle10(c[SHOULDER_Y]), angle10(c[SHOULDER_Z]), (int16_t)STEP_TIME_MS, shift100(planShift[SHOULDER_Y])};
   Arm::twai.sendData(CAN_SHOULDER_SET_YZ_DEGREE, f.bytes);
-  f.values = {angle10(c[ELBOW_Y]), (int16_t)STEP_TIME_MS, (int16_t)PARAMETER_IS_NAN, (int16_t)PARAMETER_IS_NAN};
+  f.values = {angle10(c[ELBOW_Y]), (int16_t)STEP_TIME_MS, shift100(planShift[ELBOW_Y]), (int16_t)PARAMETER_IS_NAN};
   Arm::twai.sendData(CAN_ELBOW_SET_Y_DEGREE, f.bytes);
-  f.values = {angle10(c[WRIST_Y]), angle10(c[WRIST_Z]), (int16_t)STEP_TIME_MS, (int16_t)PARAMETER_IS_NAN};
+  f.values = {angle10(c[WRIST_Y]), angle10(c[WRIST_Z]), (int16_t)STEP_TIME_MS, shift100(planShift[WRIST_Y])};
   Arm::twai.sendData(CAN_WRIST_SET_YZ_DEGREE, f.bytes);
   f.values = {angle10(c[CLAW_Y]), angle10(c[CLAW_X]), (int16_t)PARAMETER_IS_NAN, (int16_t)STEP_TIME_MS};
   Arm::twai.sendData(CAN_CLAW_SET_XYG_DEGREE, f.bytes);
@@ -84,12 +144,15 @@ void sendWaypoint(const float c[N]) {
   }
 }
 
+bool learnTick();
+
 void streamTask(void *) {
   TickType_t last = xTaskGetTickCount();
   for (;;) {
     vTaskDelayUntil(&last, pdMS_TO_TICKS(INTERVAL_MS));
     float c[N];
     bool send = false;
+    bool learn = false;
     portENTER_CRITICAL(&planLock);
     if (planActive) {
       if (!PowerManagement::getEnginesStatus() || planNext >= planCount) {
@@ -98,13 +161,72 @@ void streamTask(void *) {
         std::copy(plan[planNext], plan[planNext] + N, c);
         planNext = planNext + 1;
         send = true;
+        if (planNext >= planCount) {
+          lastPointAt = xTaskGetTickCount();
+          learnPending = PowerManagement::getEnginesStatus();
+          learnWindowOpen = false;
+          learnSamples = 0;
+          std::fill(learnSum, learnSum + N, 0.0);
+        }
       }
+    } else if (learnPending) {
+      learn = true;
     }
     portEXIT_CRITICAL(&planLock);
     if (send) {
       sendWaypoint(c);
     }
+    if (learn && !learnTick()) {
+      learnPending = false;
+    }
   }
+}
+
+// One step of the window after a move: sums the joint angles while all three modules report waiting
+// (see LEARN_RATE), and once the first stops, learns how far each joint ended past its goal into
+// learned[]. False once the window is over, either way.
+bool learnTick() {
+  const uint64_t waiting = Arm::status.shoulderStatuses & Arm::status.elbowStatuses &
+                           Arm::status.wristStatuses & STATUS_STREAM_WAITING;
+  const uint32_t sinceMs = (xTaskGetTickCount() - lastPointAt) * portTICK_PERIOD_MS;
+  if (waiting && sinceMs < LEARN_MAX_MS) {
+    Homes homes;
+    float a[N];
+    const char *why = nullptr;
+    if (!Motion::readArm(homes, a, &why)) {
+      learnWhy = why;  // a status dropout: skip the sample
+      return true;
+    }
+    learnWindowOpen = true;
+    for (int j : LEARN_JOINTS) {
+      learnSum[j] += a[j];
+    }
+    learnSamples++;
+    return true;
+  }
+  if (!learnWindowOpen) {
+    if (sinceMs < LEARN_START_MS) {
+      return true;
+    }
+    learnWhy = "the modules never reported waiting for the arm to calm (old firmware?)";
+    return false;
+  }
+  lastLearnSamples = learnSamples;
+  if (learnSamples < LEARN_MIN_SAMPLES) {
+    learnWhy = "the arm calmed too briefly to learn from";
+    return false;
+  }
+  learnWhy = nullptr;
+  for (int j : LEARN_JOINTS) {
+    if (planWay[j] < 0) {
+      continue;
+    }
+    const float overrun = (float)(learnSum[j] / learnSamples - planGoal[j]) / DEG;
+    lastOverrun[j] = overrun;
+    float &l = learned[j][planWay[j]];
+    l = std::max(-LEARN_MAX_DEG, std::min(LEARN_MAX_DEG, l + LEARN_RATE * overrun));
+  }
+  return false;
 }
 
 bool fail(JsonObject reply, const char *why) {
@@ -277,7 +399,32 @@ bool start(const Request &q, JsonObject reply) {
   planCount = n;
   planNext = 0;
   planActive = true;
+  learnPending = false;
+  for (int j = 0; j < N; j++) {
+    planShift[j] = 0.0f;
+    planWay[j] = -1;
+    planGoal[j] = goal.angles[j];
+  }
+  for (int j : LEARN_JOINTS) {
+    const float travel = (goal.angles[j] - a0[j]) / DEG;
+    // Not the shoulder on the way back up (falling angles): measured live (2026-11-17), it ended
+    // 0.8-0.9deg past whatever the shift - 0, 0.32, 0.69, 1.00 - until at 1.97 it stopped 2.2deg short:
+    // the shift only moved it across its backlash, and the settle after it took the claw 40 mm away.
+    if (j == SHOULDER_Y && travel < 0.0f) {
+      continue;
+    }
+    if (q.learn && std::fabs(travel) >= LEARN_MIN_TRAVEL_DEG) {
+      planWay[j] = travel >= 0.0f ? 0 : 1;
+      planShift[j] = learned[j][planWay[j]];
+    }
+  }
   portEXIT_CRITICAL(&planLock);
+  JsonObject shifts = reply.createNestedObject("endShift");
+  for (int j : LEARN_JOINTS) {
+    if (planWay[j] >= 0) {
+      shifts[JOINT_NAMES[j]] = planShift[j];
+    }
+  }
   reply["ok"] = true;
   reply["points"] = n;
   reply["topSpeed"] = topSpeed;
@@ -297,26 +444,39 @@ bool running() { return planActive; }
 void begin() {
   xTaskCreatePinnedToCore(streamTask, "Motion::stream", 4096, nullptr, 4, nullptr, 1);
 
-  for (const char *path : {"/move", "/stop", "/pose"}) {
+  for (const char *path : {"/move", "/stop", "/pose", "/learn"}) {
     Server.on(path, HTTP_OPTIONS, [](AsyncWebServerRequest *request) { request->send(200); });
   }
   // {"x", "y", "z", "pitch", "azimuth" (default: toward the point), "roll" (optional), "timeMS",
   //  "path": "line" | "joint", "brake" (the share of the time spent braking, 0.5..0.85, optional)},
-  //  or instead of the claw target {"home": true} (every joint but claw-x to its calibration pose -
-  //  the arm vertical) or {"angles": {"elbow-y": deg, ...}} (joint angles from the calibration pose,
-  //  the joints not named stay) - both a joint path, both taking "timeMS" and "brake" too.
+  //  or instead of the claw target {"home": true} (the parking pose: every joint but claw-x to its
+  //  calibration pose, the elbow and the wrist bent forward - PARK_ELBOW_DEG), {"vertical": true}
+  //  (the calibration pose itself - the arm vertical; never learned from) or {"angles": {"elbow-y": deg, ...}} (joint
+  //  angles from the calibration pose, the joints not named stay) - all a joint path, all taking
+  //  "timeMS" and "brake" too.
+  //  "learn": false - no learned end shift and no learning from this move (Request::learn).
+  // POST /learn sets the learned shifts (see below).
   auto *move = new AsyncCallbackJsonWebHandler("/move", [](AsyncWebServerRequest *request, JsonVariant json) {
-    DynamicJsonDocument doc(512);
+    DynamicJsonDocument doc(768);
     JsonObject reply = doc.to<JsonObject>();
     JsonObject in = json.as<JsonObject>();
     Request q{};
+    q.learn = in.isNull() || !in.containsKey("learn") || in["learn"].as<bool>();
     float timeMS = 3000;
     const bool home = !in.isNull() && in["home"].as<bool>();
+    const bool vertical = !in.isNull() && in["vertical"].as<bool>();
     const bool angles = !in.isNull() && in["angles"].is<JsonObject>();
-    if (home || angles) {
+    if (home || vertical || angles) {
       q.jointTarget = true;
       for (int j = 0; j < N; j++) {
-        q.jointDeg[j] = home && j != CLAW_X ? 0.0f : NAN;
+        q.jointDeg[j] = (home || vertical) && j != CLAW_X ? 0.0f : NAN;
+      }
+      if (home && !vertical) {
+        q.jointDeg[ELBOW_Y] = PARK_ELBOW_DEG;
+        q.jointDeg[WRIST_Y] = PARK_WRIST_DEG;
+      }
+      if (vertical) {
+        q.learn = false;  // where a move to vertical stops is chance (see PARK_ELBOW_DEG)
       }
       if (angles) {
         JsonObject a = in["angles"].as<JsonObject>();
@@ -360,13 +520,44 @@ void begin() {
   });
   Server.addHandler(move);
 
+  // Sets the learned end-of-move overshoot (it lives in RAM, so a reboot forgets it): {"shoulder-y":
+  // [growing, falling], "elbow-y": [...], "wrist-y": [...]}, any of them; replies with all of it.
+  auto *learn = new AsyncCallbackJsonWebHandler("/learn", [](AsyncWebServerRequest *request, JsonVariant json) {
+    DynamicJsonDocument doc(512);
+    JsonObject reply = doc.to<JsonObject>();
+    JsonObject in = json.as<JsonObject>();
+    for (int j : LEARN_JOINTS) {
+      if (in.isNull() || !in[JOINT_NAMES[j]].is<JsonArray>()) {
+        continue;
+      }
+      JsonArray w = in[JOINT_NAMES[j]].as<JsonArray>();
+      for (int k = 0; k < 2 && k < (int)w.size(); k++) {
+        const float v = w[k].as<float>();
+        if (!std::isnan(v)) {
+          learned[j][k] = std::max(-LEARN_MAX_DEG, std::min(LEARN_MAX_DEG, v));
+        }
+      }
+    }
+    reply["ok"] = true;
+    JsonObject l = reply.createNestedObject("learned");
+    for (int j : LEARN_JOINTS) {
+      JsonArray w = l.createNestedArray(JOINT_NAMES[j]);
+      w.add(learned[j][0]);
+      w.add(learned[j][1]);
+    }
+    AsyncResponseStream *resp = request->beginResponseStream("application/json");
+    serializeJson(doc, *resp);
+    request->send(resp);
+  });
+  Server.addHandler(learn);
+
   Server.on("/stop", HTTP_POST, [](AsyncWebServerRequest *request) {
     stop();
     request->send(200, "application/json", "{\"ok\":true}");
   });
 
   Server.on("/pose", HTTP_POST, [](AsyncWebServerRequest *request) {
-    DynamicJsonDocument doc(768);
+    DynamicJsonDocument doc(1280);
     JsonObject reply = doc.to<JsonObject>();
     Homes homes;
     float a[N];
@@ -385,6 +576,22 @@ void begin() {
       for (int k = 0; k < N; k++) {
         angles[JOINT_NAMES[k]] = a[k] / DEG;
         h[JOINT_NAMES[k]] = homes.deg[k];
+      }
+      // The end-of-move overshoot learned per joint: [toward growing angles, falling], and the last
+      // move's overrun (deg, joint angles) with how many readings it's the mean of.
+      if (learnWhy != nullptr) {
+        reply["learnError"] = learnWhy;
+      }
+      reply["learnSamples"] = lastLearnSamples;
+      JsonObject l = reply.createNestedObject("learned");
+      JsonObject o = reply.createNestedObject("lastOverrun");
+      for (int j : LEARN_JOINTS) {
+        JsonArray w = l.createNestedArray(JOINT_NAMES[j]);
+        w.add(learned[j][0]);
+        w.add(learned[j][1]);
+        if (!std::isnan(lastOverrun[j])) {
+          o[JOINT_NAMES[j]] = lastOverrun[j];
+        }
       }
     }
     AsyncResponseStream *resp = request->beginResponseStream("application/json");

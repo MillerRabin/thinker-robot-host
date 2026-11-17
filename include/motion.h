@@ -29,6 +29,10 @@ struct Request {
   // any host move.
   bool jointTarget;
   float jointDeg[kin::N];
+  // Use and update the learned end-of-move overshoot. Off: the joints end on the goal itself and the
+  // move teaches nothing - for a test, or a stop the overshoot doesn't describe (2026-11-13: near
+  // vertical the arm falls through its gear backlash, the reading lands on a random phase of the swing).
+  bool learn;
 };
 
 // Where the arm is: the calibrated homes and its joint angles, from the modules' broadcasts. False, with

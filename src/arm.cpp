@@ -1,4 +1,5 @@
 #include "arm.h"
+#include "tune.h"
 
 TWAI Arm::twai((gpio_num_t)TWAI_RX_GPIO, (gpio_num_t)TWAI_TX_GPIO, Arm::twaiCallback, Arm::twaiErrorCallback);
 ArmShoulder Arm::shoulder;
@@ -10,7 +11,11 @@ ArmStatus Arm::status;
 PowerManagement Arm::powerManagement;
 
 void Arm::twaiCallback(CanFrame frame) {
-  uint32_t ident = frame.identifier;  
+  uint32_t ident = frame.identifier;
+  if (ident == CAN_SHOULDER_TUNED || ident == CAN_ELBOW_TUNED || ident == CAN_WRIST_TUNED) {
+    Tune::onReply(frame.data);
+    return;
+  }
   if (ident == CAN_SHOULDER_QUATERNION) {
     Arm::status.shoulderQuaternionOK = true;
     shoulder.imu.quaternion.deserialize(frame.data);
@@ -30,6 +35,7 @@ void Arm::twaiCallback(CanFrame frame) {
   }
   if (ident == CAN_SHOULDER_STATUSES) {
     memcpy(&Arm::status.shoulderStatuses, frame.data, 8);
+    Tune::heard(Tune::SHOULDER);
     return;
   }
 
@@ -53,6 +59,7 @@ void Arm::twaiCallback(CanFrame frame) {
 
   if (ident == CAN_ELBOW_STATUSES) {
     memcpy(&Arm::status.elbowStatuses, frame.data, 8);
+    Tune::heard(Tune::ELBOW);
     return;
   }
 
@@ -73,6 +80,7 @@ void Arm::twaiCallback(CanFrame frame) {
 
   if (ident == CAN_WRIST_STATUSES) {
     memcpy(&Arm::status.wristStatuses, frame.data, 8);
+    Tune::heard(Tune::WRIST);
     return;
   }
 

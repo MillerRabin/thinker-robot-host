@@ -10,6 +10,7 @@
 #include "updateHandler.h"
 #include "engineHandler.h"
 #include "motion.h"
+#include "tune.h"
 #include "server.h"
 #include "config.h"
 
@@ -89,6 +90,7 @@ void setup(){
   serverBegin();
   enableEngineHandler();
   Motion::begin();
+  Tune::begin();
 }
 
 void loop() {
