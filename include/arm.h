@@ -23,6 +23,12 @@ class ArmStatus {
     bool wristQuaternionOK;
     bool clawQuaternionOK;
     bool clawRangeOK;
+    // millis() each was last heard (| 1, 0 = never); Arm::loop() works the *OK flags out of them.
+    volatile uint32_t shoulderQuaternionAt;
+    volatile uint32_t elbowQuaternionAt;
+    volatile uint32_t wristQuaternionAt;
+    volatile uint32_t clawQuaternionAt;
+    volatile uint32_t clawRangeAt;
     uint64_t shoulderStatuses;
     uint64_t elbowStatuses;
     uint64_t wristStatuses;

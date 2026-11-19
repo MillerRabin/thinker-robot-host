@@ -17,6 +17,7 @@ void Arm::twaiCallback(CanFrame frame) {
     return;
   }
   if (ident == CAN_SHOULDER_QUATERNION) {
+    Arm::status.shoulderQuaternionAt = millis() | 1;
     Arm::status.shoulderQuaternionOK = true;
     shoulder.imu.quaternion.deserialize(frame.data);
     return;
@@ -40,6 +41,7 @@ void Arm::twaiCallback(CanFrame frame) {
   }
 
   if (ident == CAN_ELBOW_QUATERNION) {
+    Arm::status.elbowQuaternionAt = millis() | 1;
     Arm::status.elbowQuaternionOK = true;
     elbow.imu.quaternion.deserialize(frame.data);
     return;
@@ -64,6 +66,7 @@ void Arm::twaiCallback(CanFrame frame) {
   }
 
   if (ident == CAN_WRIST_QUATERNION) { 
+    Arm::status.wristQuaternionAt = millis() | 1;
     Arm::status.wristQuaternionOK = true;
     wrist.imu.quaternion.deserialize(frame.data);
     return;
@@ -89,6 +92,7 @@ void Arm::twaiCallback(CanFrame frame) {
   }
 
   if (ident == CAN_CLAW_QUATERNION) { 
+    Arm::status.clawQuaternionAt = millis() | 1;
     Arm::status.clawQuaternionOK = true;
     claw.imu.quaternion.deserialize(frame.data);
     return;
@@ -105,6 +109,7 @@ void Arm::twaiCallback(CanFrame frame) {
   }
 
   if (ident == CAN_CLAW_RANGE) {
+    Arm::status.clawRangeAt = millis() | 1;
     Arm::status.clawRangeOK = true;
     claw.range.deserialize(frame.data);
     return;
@@ -135,14 +140,23 @@ void Arm::detectorsCallback(uint32_t id, uint64_t data) {
   twai.sendData(id, (uint8_t*)&data);  
 }
 
+// A module counts as heard for HEARD_MS after its last frame. Was: the flags cleared once a second
+// for the next frame to set again, and whatever read them in the 10-16 ms between saw the module
+// unheard - /pose and /move answered "a module's IMU isn't heard" now and then (2026-11).
+constexpr uint32_t HEARD_MS = 1000;
+
+static bool heardWithin(uint32_t at) {
+  return at != 0 && (int32_t)(millis() - at) <= (int32_t)HEARD_MS;
+}
+
 void Arm::loop(void* parameters) {
   while (true) {
-    Arm::status.shoulderQuaternionOK = false;
-    Arm::status.elbowQuaternionOK = false;
-    Arm::status.wristQuaternionOK = false;
-    Arm::status.clawRangeOK = false;
-    Arm::status.clawQuaternionOK = false;
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    Arm::status.shoulderQuaternionOK = heardWithin(Arm::status.shoulderQuaternionAt);
+    Arm::status.elbowQuaternionOK = heardWithin(Arm::status.elbowQuaternionAt);
+    Arm::status.wristQuaternionOK = heardWithin(Arm::status.wristQuaternionAt);
+    Arm::status.clawRangeOK = heardWithin(Arm::status.clawRangeAt);
+    Arm::status.clawQuaternionOK = heardWithin(Arm::status.clawQuaternionAt);
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
