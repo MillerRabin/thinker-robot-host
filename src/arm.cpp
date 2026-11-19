@@ -68,6 +68,10 @@ void Arm::twaiCallback(CanFrame frame) {
     wrist.imu.quaternion.deserialize(frame.data);
     return;
   }
+  if (ident == CAN_WRIST_ANGLES) {
+    ArmWrist::setAngles(frame.data);
+    return;
+  }
   if (ident == CAN_WRIST_ACCELEROMETER) {
     wrist.imu.accelerometer.deserialize(frame.data);  
     return;

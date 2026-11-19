@@ -28,13 +28,8 @@ constexpr uint64_t STATUS_IMU_RECOVERING = 0x2000;
 constexpr float SHOULDER_Z_HOME = 135.0f;   // shoulder-z's home never changes
 constexpr float DEG = 3.14159265358979f / 180.0f;
 
-// The wrist's frame in its own IMU's corrected frame (module firmware: WRIST_Z_JOINT_AXIS,
-// WRIST_UP_AXIS, WRIST_SIDE_AXIS = up x Z) - to read its broadcast the way it does.
-const V3 WRIST_FWD = {-0.221f, 0.208f, 0.953f};
-const V3 WRIST_UP = {-0.8026f, -0.5938f, -0.0565f};
-const V3 WRIST_SIDE = {WRIST_UP.y * WRIST_FWD.z - WRIST_UP.z * WRIST_FWD.y,
-                       WRIST_UP.z * WRIST_FWD.x - WRIST_UP.x * WRIST_FWD.z,
-                       WRIST_UP.x * WRIST_FWD.y - WRIST_UP.y * WRIST_FWD.x};
+// The wrist's angles older than this aren't its angles now (it sends them every engine tick).
+constexpr uint32_t WRIST_ANGLES_STALE_MS = 200;
 
 // The plan: each waypoint's commands (deg, NaN = leave that joint). Written by start() under the lock,
 // read by the streaming task.
@@ -290,14 +285,24 @@ bool readArm(Homes &homes, float angles[N], const char **why) {
     *why = "shoulder-z's or claw-y's command isn't published";
     return false;
   }
-  const Q sq = toQ(Arm::shoulder.imu.quaternion), eq = toQ(Arm::elbow.imu.quaternion),
-          wq = toQ(Arm::wrist.imu.quaternion);
+  const Q sq = toQ(Arm::shoulder.imu.quaternion), eq = toQ(Arm::elbow.imu.quaternion);
   float r[N];
   r[SHOULDER_Z] = (zCommand - SHOULDER_Z_HOME) * DEG;
   r[SHOULDER_Y] = twistAngle(sq, {0, 1, 0});
   r[ELBOW_Y] = twistAngle(eq, {0, 1, 0});
-  // The wrist takes its angles after undoing the shoulder IMU's yaw, as its firmware does.
-  wristAngles(wq, twistAngle(sq, {0, 0, 1}), WRIST_FWD, WRIST_SIDE, WRIST_UP, r[WRIST_Y], r[WRIST_Z]);
+  // The wrist's own (CAN_WRIST_ANGLES). They were worked out here from its quaternion with a copy of
+  // its axes and the shoulder IMU's turn; on 2026-11-19 its axes were re-measured and the turn got a
+  // gravity-kept offset, and the copy read the claw bent 25deg where the wrist held it at 2.
+  float wristPitchDeg, wristBendDeg;
+  uint32_t wristAt;
+  ArmWrist::readAngles(wristPitchDeg, wristBendDeg, wristAt);
+  if (wristAt == 0 || millis() - wristAt > WRIST_ANGLES_STALE_MS || std::isnan(wristPitchDeg) ||
+      std::isnan(wristBendDeg)) {
+    *why = "the wrist's angles aren't heard (old firmware?)";
+    return false;
+  }
+  r[WRIST_Y] = wristPitchDeg * DEG;
+  r[WRIST_Z] = wristBendDeg * DEG;
   r[CLAW_Y] = (clawYCommand - homes.deg[CLAW_Y]) * DEG;
   r[CLAW_X] = std::isnan(lastClawX) ? 0.0f : (lastClawX - homes.deg[CLAW_X]) * DEG;
   anglesFromReadings(r, nullptr, angles);
