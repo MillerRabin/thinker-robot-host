@@ -29,7 +29,7 @@ const Name PARAMS[] = {
     {"settleTolerance", 9},  {"settleSpeed", 10},     {"calmSpan", 11},       {"calmBlockMs", 12},
     {"calmWaitMaxMs", 13},   {"holdWakeDeg", 14},     {"holdWakeMs", 15},     {"holdWakeNowDeg", 16},
     {"parentWait", 17},      {"parentFollow", 18},    {"entrySec", 19},       {"correctionMax", 20},
-    {"resetIMU", 21},
+    {"resetIMU", 21},        {"fusionGate", 22},
 };
 // Parameters that are actions, not settings: never kept in the profile (resent at a module's boot).
 bool isAction(int param) { return param == 21; }
@@ -141,8 +141,12 @@ void resendTask(void *) {
   for (;;) {
     vTaskDelay(pdMS_TO_TICKS(200));
     for (int m = 0; m < MODULES; m++) {
-      const uint32_t since = millis() - lastHeard[m];
-      if (lastHeard[m] == 0 || since > SILENCE_MS) {
+      // The receive task stamps a module ~every 5 ms and can do it between a millis() and the read of
+      // its stamp, a stamp can also be 1 ms ahead (the | 1), and unsigned the difference then wrapped to
+      // ~49 days: the profile went out again every few seconds, in moves too (2026-11-19).
+      const uint32_t heardAt = lastHeard[m];
+      const int32_t since = (int32_t)(millis() - heardAt);
+      if (heardAt == 0 || since > (int32_t)SILENCE_MS) {
         applied[m] = false;
         continue;
       }
