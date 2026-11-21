@@ -33,6 +33,10 @@ struct Request {
   // move teaches nothing - for a test, or a stop the overshoot doesn't describe (2026-11-13: near
   // vertical the arm falls through its gear backlash, the reading lands on a random phase of the swing).
   bool learn;
+  // A named pose (home, rest, vertical): a joint angle past what its module accepts after this boot's
+  // calibration is taken to the end of that range instead of refusing the move - claw-y's home moved
+  // 89.0 -> 86.3 between two calibrations (2026-11-21) and the parking pose asks for its end.
+  bool toRange;
 };
 
 // Where the arm is: the calibrated homes and its joint angles, from the modules' broadcasts. False, with

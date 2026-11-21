@@ -64,17 +64,24 @@ constexpr uint32_t LEARN_MAX_MS = 5000;    // a window still open this long ends
 constexpr int LEARN_MIN_SAMPLES = 5;       // INTERVAL_MS each
 const int LEARN_JOINTS[] = {SHOULDER_Y, ELBOW_Y, WRIST_Y};
 float learned[N][2] = {};
-// The parking pose ({"home": true}): the calibration pose with the forearm and the claw bent forward
-// this far, so every Y joint carries a share of the weight beyond it and its gears stay pressed to
-// one side. Measured live (2026-11-17): stopping at vertical, the links rolled across their backlash
+// The parking pose ({"home": true}), picked by the user on 2026-11-21 (the platform on a table corner):
+// the upper arm 80deg out toward +x, the forearm upright, the wrist level toward -x and the claw
+// pointing down, the tip at about (-111, 0, 127) - every Y joint loaded one way, its gears pressed to
+// one side. Cut unpowered there the shoulder sagged to 80, the forearm stood up and the wrist and the
+// claw fell below the table's edge - so the engines are cut at the rest pose, not here.
+constexpr float PARK_SHOULDER_DEG = 80.0f;
+constexpr float PARK_ELBOW_DEG = -83.0f;
+constexpr float PARK_WRIST_DEG = -87.0f;
+constexpr float PARK_CLAW_Y_DEG = -87.0f;  // claw-y's range ends at about -87 (its command 2)
+// The parking pose before it (2026-11-17 to 11-21): the calibration pose with the forearm and the claw
+// bent 15+15 forward, so every Y joint carried a share of the weight beyond it. Measured live
+// (2026-11-17): stopping at vertical, the links rolled across their backlash
 // as the load changed sides - in the last 1.5 s of a move back up the elbow swung -4..+6deg about its
 // setpoint and the wrist +-7, where the arm stopped depended on the phase of that swing (2 of 4 moves
 // stopped 2-4deg short, the settle then threw the tip from +69 to -79 mm), and no learned shift could
 // fix it. The whole arm leaned 4.5deg forward still left the elbow and the wrist nearly unloaded: one
 // move stopped with the wrist 7.5deg short and its settle took the tip 99 mm. Bent 15+15 the joints
 // calmed within 0.5 s of the stop and the tip ended within 9 mm of the target, without learning.
-constexpr float PARK_ELBOW_DEG = 15.0f;
-constexpr float PARK_WRIST_DEG = 15.0f;
 // The rest pose ({"rest": true}), where the arm waits for its engines to be cut: near vertical, so
 // unpowered it hardly droops, the forearm and the claw still bent forward this far so their gears stay
 // pressed to one side. Measured live (2026-11-21, from the parking pose): every move to vertical itself
@@ -333,6 +340,17 @@ bool start(const Request &q, JsonObject reply) {
     for (int j = 0; j < N; j++) {
       goal.angles[j] = std::isnan(q.jointDeg[j]) ? a0[j] : q.jointDeg[j] * DEG;
     }
+    if (q.toRange) {
+      float lo[N], hi[N];
+      jointLimits(homes, lo, hi);
+      JsonObject clamped;
+      for (int j = 0; j < N; j++) {
+        if (std::isnan(q.jointDeg[j]) || (goal.angles[j] >= lo[j] && goal.angles[j] <= hi[j])) continue;
+        goal.angles[j] = std::min(hi[j], std::max(lo[j], goal.angles[j]));
+        if (clamped.isNull()) clamped = reply.createNestedObject("toRange");
+        clamped[JOINT_NAMES[j]] = goal.angles[j] / DEG;
+      }
+    }
     moveClawX = !std::isnan(q.jointDeg[CLAW_X]);
     forward(goal.angles, goal.pose);
     if (goal.pose.lowest() < FLOOR_CLEARANCE) {
@@ -472,7 +490,7 @@ void begin() {
   // {"x", "y", "z", "pitch", "azimuth" (default: toward the point), "roll" (optional), "timeMS",
   //  "path": "line" | "joint", "brake" (the share of the time spent braking, 0.5..0.85, optional)},
   //  or instead of the claw target {"home": true} (the parking pose: every joint but claw-x to its
-  //  calibration pose, the elbow and the wrist bent forward - PARK_ELBOW_DEG), {"rest": true} (near
+  //  upper arm out, the forearm up, the wrist level, the claw down - PARK_SHOULDER_DEG), {"rest": true} (near
   //  vertical, to cut the engines in - REST_ELBOW_DEG; never learned from), {"vertical": true}
   //  (the calibration pose itself - the arm vertical; never learned from) or {"angles": {"elbow-y": deg, ...}} (joint
   //  angles from the calibration pose, the joints not named stay) - all a joint path, all taking
@@ -500,12 +518,15 @@ void begin() {
         q.jointDeg[WRIST_Y] = REST_WRIST_DEG;
         q.learn = false;  // a pose to cut the engines in, not one the moves are tuned for
       } else if (home && !vertical) {
+        q.jointDeg[SHOULDER_Y] = PARK_SHOULDER_DEG;
         q.jointDeg[ELBOW_Y] = PARK_ELBOW_DEG;
         q.jointDeg[WRIST_Y] = PARK_WRIST_DEG;
+        q.jointDeg[CLAW_Y] = PARK_CLAW_Y_DEG;
       }
       if (vertical) {
-        q.learn = false;  // where a move to vertical stops is chance (see PARK_ELBOW_DEG)
+        q.learn = false;  // where a move to vertical stops is chance (see the parking pose before)
       }
+      q.toRange = home || rest || vertical;
       if (angles) {
         JsonObject a = in["angles"].as<JsonObject>();
         for (int j = 0; j < N; j++) {
