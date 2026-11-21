@@ -75,6 +75,14 @@ float learned[N][2] = {};
 // calmed within 0.5 s of the stop and the tip ended within 9 mm of the target, without learning.
 constexpr float PARK_ELBOW_DEG = 15.0f;
 constexpr float PARK_WRIST_DEG = 15.0f;
+// The rest pose ({"rest": true}), where the arm waits for its engines to be cut: near vertical, so
+// unpowered it hardly droops, the forearm and the claw still bent forward this far so their gears stay
+// pressed to one side. Measured live (2026-11-21, from the parking pose): every move to vertical itself
+// rolled the links across their backlash - the elbow swung 2.8-9.5deg, the wrist 2.6-15, the tip
+// -53..+56 mm, 10 s no better than 5, each stopping on a random side and settling 2-3 s; bent 5+5 the
+// elbow stayed within 0.6deg after the stop and the wrist 2.4, settled in 1 s.
+constexpr float REST_ELBOW_DEG = 5.0f;
+constexpr float REST_WRIST_DEG = 5.0f;
 float lastOverrun[N] = {NAN, NAN, NAN, NAN, NAN, NAN, NAN};
 const char *learnWhy = nullptr;  // why the last move taught nothing
 // The window: joint angles summed while all three modules report waiting.
@@ -464,7 +472,8 @@ void begin() {
   // {"x", "y", "z", "pitch", "azimuth" (default: toward the point), "roll" (optional), "timeMS",
   //  "path": "line" | "joint", "brake" (the share of the time spent braking, 0.5..0.85, optional)},
   //  or instead of the claw target {"home": true} (the parking pose: every joint but claw-x to its
-  //  calibration pose, the elbow and the wrist bent forward - PARK_ELBOW_DEG), {"vertical": true}
+  //  calibration pose, the elbow and the wrist bent forward - PARK_ELBOW_DEG), {"rest": true} (near
+  //  vertical, to cut the engines in - REST_ELBOW_DEG; never learned from), {"vertical": true}
   //  (the calibration pose itself - the arm vertical; never learned from) or {"angles": {"elbow-y": deg, ...}} (joint
   //  angles from the calibration pose, the joints not named stay) - all a joint path, all taking
   //  "timeMS" and "brake" too.
@@ -479,13 +488,18 @@ void begin() {
     float timeMS = 3000;
     const bool home = !in.isNull() && in["home"].as<bool>();
     const bool vertical = !in.isNull() && in["vertical"].as<bool>();
+    const bool rest = !in.isNull() && in["rest"].as<bool>() && !vertical;
     const bool angles = !in.isNull() && in["angles"].is<JsonObject>();
-    if (home || vertical || angles) {
+    if (home || vertical || rest || angles) {
       q.jointTarget = true;
       for (int j = 0; j < N; j++) {
-        q.jointDeg[j] = (home || vertical) && j != CLAW_X ? 0.0f : NAN;
+        q.jointDeg[j] = (home || vertical || rest) && j != CLAW_X ? 0.0f : NAN;
       }
-      if (home && !vertical) {
+      if (rest) {
+        q.jointDeg[ELBOW_Y] = REST_ELBOW_DEG;
+        q.jointDeg[WRIST_Y] = REST_WRIST_DEG;
+        q.learn = false;  // a pose to cut the engines in, not one the moves are tuned for
+      } else if (home && !vertical) {
         q.jointDeg[ELBOW_Y] = PARK_ELBOW_DEG;
         q.jointDeg[WRIST_Y] = PARK_WRIST_DEG;
       }
@@ -510,7 +524,7 @@ void begin() {
       reply["planMs"] = millis() - t0;
     } else if (in.isNull() || !getFloat(in, "x", q.target.x) || !getFloat(in, "y", q.target.y) ||
                !getFloat(in, "z", q.target.z) || !getFloat(in, "pitch", q.pitch)) {
-      fail(reply, "need x, y, z and pitch, or home, or angles");
+      fail(reply, "need x, y, z and pitch, or home, rest, vertical or angles");
     } else {
       if (!getFloat(in, "azimuth", q.azimuth)) {
         q.azimuth = std::atan2(q.target.y, q.target.x) / DEG;
