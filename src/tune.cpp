@@ -29,7 +29,7 @@ const Name PARAMS[] = {
     {"settleTolerance", 9},  {"settleSpeed", 10},     {"calmSpan", 11},       {"calmBlockMs", 12},
     {"calmWaitMaxMs", 13},   {"holdWakeDeg", 14},     {"holdWakeMs", 15},     {"holdWakeNowDeg", 16},
     {"parentWait", 17},      {"parentFollow", 18},    {"entrySec", 19},       {"correctionMax", 20},
-    {"resetIMU", 21},        {"fusionGate", 22},      {"leadSmaller", 23},    {"leadLarger", 24},
+    {"resetIMU", 21},        {"fusionGate", 22},      {"leadLift", 23},       {"leadLower", 24},
     {"leadLearn", 25},       {"leadFullSpeed", 26},
 };
 // Parameters that are actions, not settings: never kept in the profile (resent at a module's boot).

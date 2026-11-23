@@ -40,6 +40,10 @@
 // Runtime tuning of the modules (see src/tune.cpp; the modules' common/tuning/tuning.h has the frame
 // layout and the TUNE_* numbers - change both together).
 #define CAN_TUNE 0x0B
+// The gravity torque on each pitch joint for the waypoint sent next (see Motion's gravityLoads()):
+// int16 x1000 shoulder-y, elbow-y, wrist-y, unused - a share of the joint's reference load, positive
+// pulling it toward growing commands. The modules lead a stream lifting or lowering by it.
+#define CAN_GRAVITY_LOADS 0x0C
 
 #define USE_IMU_NOT_USE 0
 #define USE_IMU_USE 1

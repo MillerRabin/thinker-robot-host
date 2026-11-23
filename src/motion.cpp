@@ -34,6 +34,8 @@ constexpr uint32_t WRIST_ANGLES_STALE_MS = 200;
 // The plan: each waypoint's commands (deg, NaN = leave that joint). Written by start() under the lock,
 // read by the streaming task.
 float plan[MAX_POINTS][N];
+// Each waypoint's gravity loads on the pitch joints (see gravityLoads()), sent just before it.
+float planLoad[MAX_POINTS][3];
 volatile int planCount = 0;
 volatile int planNext = 0;
 volatile bool planActive = false;
@@ -57,6 +59,7 @@ float lastClawX = NAN;
 // elbow's shift back up went 1.46, 1.20, 0.55 in three moves.
 constexpr float LEARN_RATE = 0.4f;
 constexpr float LEARN_MIN_TRAVEL_DEG = 4.0f;
+constexpr float LEARN_MIN_LOAD = 0.1f;     // a share of the reference load (see gravityLoads())
 constexpr float LEARN_MAX_DEG = 6.0f;
 constexpr uint32_t LEARN_START_MS = 1500;  // after the last waypoint, the modules have long reported
                                            // waiting, or never will (old firmware)
@@ -139,10 +142,60 @@ int16_t shift100(float deg) {
   return (int16_t)((v == -1) ? 0 : std::max(-30000L, std::min(30000L, v)));
 }
 
+// The gravity torque on each pitch joint - shoulder-y, elbow-y, wrist-y - from the modules beyond it,
+// positive pulling the joint toward growing angles (and commands: they grow together), as a share of
+// what it is in the joint's reference pose. The modules lead a stream by it, lifting (against it) or
+// lowering (with it) - the arm works on either side of vertical, up and down (2026-11-21). The masses
+// aren't measured: the elbow, wrist and claw modules as equal points - the elbow's on its axis, the
+// wrist's between its two axes, the claw's halfway from claw-y to the tip. The reference poses are
+// where the leads were learned or set: the shoulder's the old "down" pose (4.1, 32.3, 50.5 - its lift
+// lead was set from the lifts back from there), the elbow's lifting from 45deg with the wrist at 15,
+// the wrist's level. Live (2026-11-19..21) the elbow needed 5.0deg of lead lifting from 45deg and 5.3
+// from "down" - the model's 1.00 and 1.05.
+constexpr int LOAD_JOINTS[3] = {SHOULDER_Y, ELBOW_Y, WRIST_Y};
+
+void rawTorques(const float angles[N], float tau[3]) {
+  Pose p;
+  forward(angles, p);
+  auto mid = [](const V3 &a, const V3 &b) { return V3{(a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2}; };
+  const V3 masses[3] = {p.joints[ELBOW_Y], mid(p.joints[WRIST_Y], p.joints[WRIST_Z]), mid(p.joints[CLAW_Y], p.tip)};
+  for (int i = 0; i < 3; i++) {
+    const V3 &o = p.joints[LOAD_JOINTS[i]], &a = p.axes[LOAD_JOINTS[i]];
+    float t = 0.0f;
+    for (int k = i; k < 3; k++) {  // the masses beyond the joint (the elbow module's: on its own axis)
+      // The weight's torque about the axis: a . (r x (0, 0, -1)) = -(a.x r.y - a.y r.x).
+      const V3 r{masses[k].x - o.x, masses[k].y - o.y, masses[k].z - o.z};
+      t -= a.x * r.y - a.y * r.x;
+    }
+    tau[i] = t;
+  }
+}
+
+void gravityLoads(const float angles[N], float out[3]) {
+  static float ref[3] = {NAN, NAN, NAN};
+  if (std::isnan(ref[0])) {
+    const float poses[3][N] = {{0, 4.1f * DEG, 32.3f * DEG, 50.5f * DEG, 0, 0, 0},
+                               {0, 0, 45 * DEG, 15 * DEG, 0, 0, 0},
+                               {0, 0, 0, 90 * DEG, 0, 0, 0}};
+    for (int i = 0; i < 3; i++) {
+      float t[3];
+      rawTorques(poses[i], t);
+      ref[i] = std::fabs(t[i]);
+    }
+  }
+  float t[3];
+  rawTorques(angles, t);
+  for (int i = 0; i < 3; i++) out[i] = t[i] / ref[i];
+}
+
+int16_t load1000(float v) { return (int16_t)std::max(-30000L, std::min(30000L, lroundf(v * 1000.0f))); }
+
 // One waypoint to every module: the same set frames as /set (ArmDataFrame, angles x10), with a stream
-// timeMS.
-void sendWaypoint(const float c[N]) {
+// timeMS - after the gravity loads it's planned under (CAN_GRAVITY_LOADS).
+void sendWaypoint(const float c[N], const float load[3]) {
   ArmDataFrame f{};
+  f.values = {load1000(load[0]), load1000(load[1]), load1000(load[2]), (int16_t)PARAMETER_IS_NAN};
+  Arm::twai.sendData(CAN_GRAVITY_LOADS, f.bytes);
   // The modules' joint angles add up along the arm with the same sign as theirs, so a joint's overrun
   // in joint angles is its module's too.
   f.values = {angle10(c[SHOULDER_Y]), angle10(c[SHOULDER_Z]), (int16_t)STEP_TIME_MS, shift100(planShift[SHOULDER_Y])};
@@ -164,7 +217,7 @@ void streamTask(void *) {
   TickType_t last = xTaskGetTickCount();
   for (;;) {
     vTaskDelayUntil(&last, pdMS_TO_TICKS(INTERVAL_MS));
-    float c[N];
+    float c[N], load[3];
     bool send = false;
     bool learn = false;
     const bool recovering = ((Arm::status.shoulderStatuses | Arm::status.elbowStatuses |
@@ -178,6 +231,7 @@ void streamTask(void *) {
         planActive = false;
       } else {
         std::copy(plan[planNext], plan[planNext] + N, c);
+        std::copy(planLoad[planNext], planLoad[planNext] + 3, load);
         planNext = planNext + 1;
         send = true;
         if (planNext >= planCount) {
@@ -193,7 +247,7 @@ void streamTask(void *) {
     }
     portEXIT_CRITICAL(&planLock);
     if (send) {
-      sendWaypoint(c);
+      sendWaypoint(c, load);
     }
     if (learn && !learnTick()) {
       learnPending = false;
@@ -380,6 +434,7 @@ bool start(const Request &q, JsonObject reply) {
   forward(a0, start);
   const V3 tip0 = start.tip, d0 = start.clawDirection(), d1 = goal.pose.clawDirection();
   static float next[MAX_POINTS][N];
+  static float nextLoad[MAX_POINTS][3];
   float prev[N], prevCmd[N];
   std::copy(a0, a0 + N, prev);
   commands(a0, homes, prevCmd);
@@ -427,6 +482,7 @@ bool start(const Request &q, JsonObject reply) {
       c[CLAW_X] = NAN;  // leave the jaws as they are
     }
     std::copy(c, c + N, next[k - 1]);
+    gravityLoads(a, nextLoad[k - 1]);
     std::copy(a, a + N, prev);
     commands(a, homes, prevCmd);
   }
@@ -436,6 +492,7 @@ bool start(const Request &q, JsonObject reply) {
   }
   portENTER_CRITICAL(&planLock);
   std::copy(&next[0][0], &next[0][0] + n * N, &plan[0][0]);
+  std::copy(&nextLoad[0][0], &nextLoad[0][0] + n * 3, &planLoad[0][0]);
   planCount = n;
   planNext = 0;
   planActive = true;
@@ -445,16 +502,23 @@ bool start(const Request &q, JsonObject reply) {
     planWay[j] = -1;
     planGoal[j] = goal.angles[j];
   }
-  for (int j : LEARN_JOINTS) {
+  // Learned per way: [0] lifting (against the gravity torque at the start), [1] lowering - the way of
+  // a joint's travel decides nothing on its own once the arm works on both sides of vertical. A joint
+  // starting near balance (LEARN_MIN_LOAD) learns nothing.
+  float load0[3];
+  gravityLoads(a0, load0);
+  for (int i = 0; i < 3; i++) {
+    const int j = LOAD_JOINTS[i];
     const float travel = (goal.angles[j] - a0[j]) / DEG;
-    // Not the shoulder on the way back up (falling angles): measured live (2026-11-17), it ended
-    // 0.8-0.9deg past whatever the shift - 0, 0.32, 0.69, 1.00 - until at 1.97 it stopped 2.2deg short:
-    // the shift only moved it across its backlash, and the settle after it took the claw 40 mm away.
-    if (j == SHOULDER_Y && travel < 0.0f) {
+    const bool lift = travel * load0[i] < 0.0f;
+    // Not the shoulder on a lift (the way back up): measured live (2026-11-17), it ended 0.8-0.9deg
+    // past whatever the shift - 0, 0.32, 0.69, 1.00 - until at 1.97 it stopped 2.2deg short: the shift
+    // only moved it across its backlash, and the settle after it took the claw 40 mm away.
+    if (j == SHOULDER_Y && lift) {
       continue;
     }
-    if (q.learn && std::fabs(travel) >= LEARN_MIN_TRAVEL_DEG) {
-      planWay[j] = travel >= 0.0f ? 0 : 1;
+    if (q.learn && std::fabs(travel) >= LEARN_MIN_TRAVEL_DEG && std::fabs(load0[i]) >= LEARN_MIN_LOAD) {
+      planWay[j] = lift ? 0 : 1;
       planShift[j] = learned[j][planWay[j]];
     }
   }
@@ -570,7 +634,7 @@ void begin() {
   Server.addHandler(move);
 
   // Sets the learned end-of-move overshoot (it lives in RAM, so a reboot forgets it): {"shoulder-y":
-  // [growing, falling], "elbow-y": [...], "wrist-y": [...]}, any of them; replies with all of it.
+  // [lifting, lowering], "elbow-y": [...], "wrist-y": [...]}, any of them; replies with all of it.
   auto *learn = new AsyncCallbackJsonWebHandler("/learn", [](AsyncWebServerRequest *request, JsonVariant json) {
     DynamicJsonDocument doc(512);
     JsonObject reply = doc.to<JsonObject>();
@@ -606,7 +670,7 @@ void begin() {
   });
 
   Server.on("/pose", HTTP_POST, [](AsyncWebServerRequest *request) {
-    DynamicJsonDocument doc(1280);
+    DynamicJsonDocument doc(1536);
     JsonObject reply = doc.to<JsonObject>();
     Homes homes;
     float a[N];
@@ -626,8 +690,12 @@ void begin() {
         angles[JOINT_NAMES[k]] = a[k] / DEG;
         h[JOINT_NAMES[k]] = homes.deg[k];
       }
-      // The end-of-move overshoot learned per joint: [toward growing angles, falling], and the last
-      // move's overrun (deg, joint angles) with how many readings it's the mean of.
+      float load[3];
+      gravityLoads(a, load);
+      JsonObject loads = reply.createNestedObject("loads");
+      for (int i = 0; i < 3; i++) loads[JOINT_NAMES[LOAD_JOINTS[i]]] = load[i];
+      // The end-of-move overshoot learned per joint: [lifting, lowering], and the last move's overrun
+      // (deg, joint angles) with how many readings it's the mean of. And the gravity loads now.
       if (learnWhy != nullptr) {
         reply["learnError"] = learnWhy;
       }
