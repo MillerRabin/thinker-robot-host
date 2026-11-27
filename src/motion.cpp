@@ -43,9 +43,9 @@ portMUX_TYPE planLock = portMUX_INITIALIZER_UNLOCKED;
 // claw-x runs open-loop and isn't published: the last command this module sent it, NaN = never.
 float lastClawX = NAN;
 
-// End-of-move overshoot, learned per joint and direction ([0] toward growing angles, [1] falling) in
-// joint angles, deg: how far each joint ran past its goal once the move ended (+ = toward growing
-// angles). Sent with every waypoint, so the module ends that joint's setpoint short by it (see the
+// End-of-move overshoot, learned per joint and kind of move (LEARN_SLOTS) along the joint's travel,
+// deg: how far each joint ran past its goal once the move ended (+ = past, see planDir). Sent with
+// every waypoint (in joint angles again), so the module ends that joint's setpoint short by it (see the
 // modules' Servo::setStreamEndShift()). Measured live (2026-11-11/12): braking, a link rolls across its
 // backlash 1-4.5deg past where the command stops; each module learning it from the absolute angle it
 // holds took its parent's overrun for its own - the wrist's shift flipped sign move to move.
@@ -66,7 +66,14 @@ constexpr uint32_t LEARN_START_MS = 1500;  // after the last waypoint, the modul
 constexpr uint32_t LEARN_MAX_MS = 5000;    // a window still open this long ends anyway
 constexpr int LEARN_MIN_SAMPLES = 5;       // INTERVAL_MS each
 const int LEARN_JOINTS[] = {SHOULDER_Y, ELBOW_Y, WRIST_Y};
-float learned[N][2] = {};
+// The kinds: [0] lifting the way of growing angles, [1] lifting the other way, [2] lowering the way of
+// growing angles, [3] lowering the other way - lifting against the gravity torque at the start. By the
+// way alone, two moves wanting different shifts shared one: measured live (2026-11-27, four learning
+// cycles vertical -> park -> down -> park -> vertical), the wrist's lifts down from park and back from
+// "down" ran ~1 and ~3deg past and its shift settled at ~1.8 (one ended 1 short, the other 1 past),
+// the elbow's ~0.5 short and ~0.6 past at ~0.2.
+constexpr int LEARN_SLOTS = 4;
+float learned[N][LEARN_SLOTS] = {};
 // The parking pose ({"home": true}), picked by the user on 2026-11-21 (the platform on a table corner):
 // the upper arm 80deg out toward +x, the forearm upright, the wrist level toward -x and the claw
 // pointing down, the tip at about (-111, 0, 127) - every Y joint loaded one way, its gears pressed to
@@ -538,7 +545,7 @@ bool start(const Request &q, JsonObject reply) {
       continue;
     }
     if (q.learn && std::fabs(travel) >= LEARN_MIN_TRAVEL_DEG && std::fabs(load0[i]) >= LEARN_MIN_LOAD) {
-      planWay[j] = lift ? 0 : 1;
+      planWay[j] = (lift ? 0 : 2) + (travel > 0.0f ? 0 : 1);
       planDir[j] = travel > 0.0f ? 1.0f : -1.0f;
       planShift[j] = learned[j][planWay[j]] * planDir[j];
     }
@@ -656,8 +663,8 @@ void begin() {
   Server.addHandler(move);
 
   // Sets the learned end-of-move overshoot (it lives in RAM, so a reboot forgets it): {"shoulder-y":
-  // [lifting, lowering], "elbow-y": [...], "wrist-y": [...]}, any of them, deg along the joint's travel
-  // (+ = ran past the goal, see planDir); replies with all of it.
+  // [lift up, lift down, lower up, lower down] (see LEARN_SLOTS), "elbow-y": [...], "wrist-y": [...]},
+  // any of them, deg along the joint's travel (+ = ran past the goal, see planDir); replies with all.
   auto *learn = new AsyncCallbackJsonWebHandler("/learn", [](AsyncWebServerRequest *request, JsonVariant json) {
     DynamicJsonDocument doc(512);
     JsonObject reply = doc.to<JsonObject>();
@@ -667,7 +674,7 @@ void begin() {
         continue;
       }
       JsonArray w = in[JOINT_NAMES[j]].as<JsonArray>();
-      for (int k = 0; k < 2 && k < (int)w.size(); k++) {
+      for (int k = 0; k < LEARN_SLOTS && k < (int)w.size(); k++) {
         const float v = w[k].as<float>();
         if (!std::isnan(v)) {
           learned[j][k] = std::max(-LEARN_MAX_DEG, std::min(LEARN_MAX_DEG, v));
@@ -678,8 +685,7 @@ void begin() {
     JsonObject l = reply.createNestedObject("learned");
     for (int j : LEARN_JOINTS) {
       JsonArray w = l.createNestedArray(JOINT_NAMES[j]);
-      w.add(learned[j][0]);
-      w.add(learned[j][1]);
+      for (float v : learned[j]) w.add(v);
     }
     AsyncResponseStream *resp = request->beginResponseStream("application/json");
     serializeJson(doc, *resp);
@@ -717,7 +723,7 @@ void begin() {
       gravityLoads(a, load);
       JsonObject loads = reply.createNestedObject("loads");
       for (int i = 0; i < 3; i++) loads[JOINT_NAMES[LOAD_JOINTS[i]]] = load[i];
-      // The end-of-move overshoot learned per joint: [lifting, lowering], and the last move's overrun
+      // The end-of-move overshoot learned per joint (LEARN_SLOTS), and the last move's overrun
       // (deg, joint angles) with how many readings it's the mean of. And the gravity loads now.
       if (learnWhy != nullptr) {
         reply["learnError"] = learnWhy;
@@ -727,8 +733,7 @@ void begin() {
       JsonObject o = reply.createNestedObject("lastOverrun");
       for (int j : LEARN_JOINTS) {
         JsonArray w = l.createNestedArray(JOINT_NAMES[j]);
-        w.add(learned[j][0]);
-        w.add(learned[j][1]);
+        for (float v : learned[j]) w.add(v);
         if (!std::isnan(lastOverrun[j])) {
           o[JOINT_NAMES[j]] = lastOverrun[j];
         }
