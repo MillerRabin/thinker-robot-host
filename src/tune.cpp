@@ -31,6 +31,7 @@ const Name PARAMS[] = {
     {"parentWait", 17},      {"parentFollow", 18},    {"entrySec", 19},       {"correctionMax", 20},
     {"resetIMU", 21},        {"fusionGate", 22},      {"leadLift", 23},       {"leadLower", 24},
     {"leadLearn", 25},       {"leadFullSpeed", 26},   {"sagPerLoad", 27},     {"velocityLead", 28},
+    {"leadCrossLoad", 29},
 };
 // Parameters that are actions, not settings: never kept in the profile (resent at a module's boot).
 bool isAction(int param) { return param == 21; }
