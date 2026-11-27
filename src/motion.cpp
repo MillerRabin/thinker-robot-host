@@ -105,6 +105,14 @@ bool learnWindowOpen = false;
 float planShift[N] = {};
 float planGoal[N] = {};
 int planWay[N] = {-1, -1, -1, -1, -1, -1, -1};
+// A joint a joint-angle move doesn't name stays at the last move's goal for it - what its module
+// holds - not where its IMU reads it at the start. Measured live (2026-11-27, eight such moves at the
+// parking pose turning shoulder-z, then wrist-z): taking the reading, each move took the joints' end
+// errors (0.3-1.2deg, the base's turn tilts the arm ~1deg) for their new goals, and over the eight the
+// shoulder crept 2.3deg, the elbow and the wrist 3deg. Not after a /stop, and not for a joint this far
+// from that goal (moved by hand, or a calibration since): then where it is.
+bool planGoalKept = false;
+constexpr float KEEP_GOAL_MAX_DEG = 5.0f;
 volatile bool learnPending = false;
 TickType_t lastPointAt = 0;
 
@@ -226,6 +234,7 @@ void streamTask(void *) {
     if (planActive) {
       if (!PowerManagement::getEnginesStatus() || recovering) {
         planActive = false;
+        planGoalKept = false;  // cut short: the joints never got there
         learnPending = false;
       } else if (planNext >= planCount) {
         planActive = false;
@@ -365,7 +374,10 @@ bool readArm(Homes &homes, float angles[N], const char **why) {
   float wristPitchDeg, wristBendDeg;
   uint32_t wristAt;
   ArmWrist::readAngles(wristPitchDeg, wristBendDeg, wristAt);
-  if (wristAt == 0 || millis() - wristAt > WRIST_ANGLES_STALE_MS || std::isnan(wristPitchDeg) ||
+  // Signed, as in Tune and Arm::loop: the stamp can be 1 ms ahead (the | 1) or set between the read and
+  // millis(), and unsigned that read as ~49 days old - 4 of 100 /pose calls at rest failed so, and 4 of
+  // the 9 moves of a z run (2026-11-27).
+  if (wristAt == 0 || (int32_t)(millis() - wristAt) > (int32_t)WRIST_ANGLES_STALE_MS || std::isnan(wristPitchDeg) ||
       std::isnan(wristBendDeg)) {
     *why = "the wrist's angles aren't heard (old firmware?)";
     return false;
@@ -392,7 +404,8 @@ bool start(const Request &q, JsonObject reply) {
   bool moveClawX = q.hasRoll;
   if (q.jointTarget) {
     for (int j = 0; j < N; j++) {
-      goal.angles[j] = std::isnan(q.jointDeg[j]) ? a0[j] : q.jointDeg[j] * DEG;
+      const bool keep = planGoalKept && std::fabs(planGoal[j] - a0[j]) <= KEEP_GOAL_MAX_DEG * DEG;
+      goal.angles[j] = !std::isnan(q.jointDeg[j]) ? q.jointDeg[j] * DEG : keep ? planGoal[j] : a0[j];
     }
     if (q.toRange) {
       float lo[N], hi[N];
@@ -502,6 +515,7 @@ bool start(const Request &q, JsonObject reply) {
     planWay[j] = -1;
     planGoal[j] = goal.angles[j];
   }
+  planGoalKept = true;
   // Learned per way: [0] lifting (against the gravity torque at the start), [1] lowering - the way of
   // a joint's travel decides nothing on its own once the arm works on both sides of vertical. A joint
   // starting near balance (LEARN_MIN_LOAD) learns nothing.
@@ -540,6 +554,7 @@ bool start(const Request &q, JsonObject reply) {
 void stop() {
   portENTER_CRITICAL(&planLock);
   planActive = false;
+  planGoalKept = false;
   portEXIT_CRITICAL(&planLock);
 }
 
