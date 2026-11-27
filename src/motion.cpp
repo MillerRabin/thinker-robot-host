@@ -105,6 +105,11 @@ bool learnWindowOpen = false;
 float planShift[N] = {};
 float planGoal[N] = {};
 int planWay[N] = {-1, -1, -1, -1, -1, -1, -1};
+// The way the joint travels, +-1: the learned shifts are along it (+ = ran past the goal). Signed in
+// joint angles a way mixed both directions - the wrist's lifts down from park (+177) and back from
+// "down" (-177) both ran ~2.5-3deg past, as +2.5 and -3, and its shift swung +0.6, -0.8, +0.1, -1.0
+// and never settled (2026-11-27); the elbow's ~0.35 short likewise.
+float planDir[N] = {};
 // A joint a joint-angle move doesn't name stays at the last move's goal for it - what its module
 // holds - not where its IMU reads it at the start. Measured live (2026-11-27, eight such moves at the
 // parking pose turning shoulder-z, then wrist-z): taking the reading, each move took the joints' end
@@ -306,7 +311,7 @@ bool learnTick() {
     const float overrun = (float)(learnSum[j] / learnSamples - planGoal[j]) / DEG;
     lastOverrun[j] = overrun;
     float &l = learned[j][planWay[j]];
-    l = std::max(-LEARN_MAX_DEG, std::min(LEARN_MAX_DEG, l + LEARN_RATE * overrun));
+    l = std::max(-LEARN_MAX_DEG, std::min(LEARN_MAX_DEG, l + LEARN_RATE * overrun * planDir[j]));
   }
   return false;
 }
@@ -513,6 +518,7 @@ bool start(const Request &q, JsonObject reply) {
   for (int j = 0; j < N; j++) {
     planShift[j] = 0.0f;
     planWay[j] = -1;
+    planDir[j] = 0.0f;
     planGoal[j] = goal.angles[j];
   }
   planGoalKept = true;
@@ -533,7 +539,8 @@ bool start(const Request &q, JsonObject reply) {
     }
     if (q.learn && std::fabs(travel) >= LEARN_MIN_TRAVEL_DEG && std::fabs(load0[i]) >= LEARN_MIN_LOAD) {
       planWay[j] = lift ? 0 : 1;
-      planShift[j] = learned[j][planWay[j]];
+      planDir[j] = travel > 0.0f ? 1.0f : -1.0f;
+      planShift[j] = learned[j][planWay[j]] * planDir[j];
     }
   }
   portEXIT_CRITICAL(&planLock);
@@ -649,7 +656,8 @@ void begin() {
   Server.addHandler(move);
 
   // Sets the learned end-of-move overshoot (it lives in RAM, so a reboot forgets it): {"shoulder-y":
-  // [lifting, lowering], "elbow-y": [...], "wrist-y": [...]}, any of them; replies with all of it.
+  // [lifting, lowering], "elbow-y": [...], "wrist-y": [...]}, any of them, deg along the joint's travel
+  // (+ = ran past the goal, see planDir); replies with all of it.
   auto *learn = new AsyncCallbackJsonWebHandler("/learn", [](AsyncWebServerRequest *request, JsonVariant json) {
     DynamicJsonDocument doc(512);
     JsonObject reply = doc.to<JsonObject>();
