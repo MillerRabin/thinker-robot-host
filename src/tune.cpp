@@ -20,8 +20,9 @@ struct Name {
 };
 const Name JOINTS[] = {{"shoulder-y", 1}, {"shoulder-z", 2}, {"elbow-y", 3}, {"wrist-y", 4}, {"wrist-z", 5}};
 constexpr int JOINT_IDS = 6;   // 1..5
-constexpr int PARAM_IDS = 32;  // 1..31: room for parameters to come without changing the saved size
+constexpr int PARAM_IDS = 48;  // 1..47: room for parameters to come without changing the saved size
 constexpr int PARAM_IDS_V1 = 18;  // the first saved profiles (2026-11-17, parameters 1..17)
+constexpr int PARAM_IDS_V2 = 32;  // then 1..31 (2026-11-17..27)
 Module moduleOf(int joint) { return joint <= 2 ? SHOULDER : joint == 3 ? ELBOW : WRIST; }
 const Name PARAMS[] = {
     {"dampingGain", 1},      {"dampingMax", 2},       {"dampingDeadband", 3}, {"dampingRateTau", 4},
@@ -31,7 +32,8 @@ const Name PARAMS[] = {
     {"parentWait", 17},      {"parentFollow", 18},    {"entrySec", 19},       {"correctionMax", 20},
     {"resetIMU", 21},        {"fusionGate", 22},      {"leadLift", 23},       {"leadLower", 24},
     {"leadLearn", 25},       {"leadFullSpeed", 26},   {"sagPerLoad", 27},     {"velocityLead", 28},
-    {"leadCrossLoad", 29},   {"leadMinLoad", 30},     {"leadBreakFade", 31},
+    {"leadCrossLoad", 29},   {"leadMinLoad", 30},     {"leadBreakFade", 31},  {"leadKinetic", 32},
+    {"leadArrive", 33},
 };
 // Parameters that are actions, not settings: never kept in the profile (resent at a module's boot).
 bool isAction(int param) { return param == 21; }
@@ -94,6 +96,12 @@ void loadProfile() {
     const size_t len = prefs.getBytesLength("profile");
     if (len == sizeof(profile)) {
       prefs.getBytes("profile", profile, sizeof(profile));
+    } else if (len == sizeof(float) * JOINT_IDS * PARAM_IDS_V2) {
+      float old[JOINT_IDS][PARAM_IDS_V2];
+      prefs.getBytes("profile", old, sizeof(old));
+      for (int j = 0; j < JOINT_IDS; j++) {
+        for (int q = 0; q < PARAM_IDS_V2; q++) profile[j][q] = old[j][q];
+      }
     } else if (len == sizeof(float) * JOINT_IDS * PARAM_IDS_V1) {
       float old[JOINT_IDS][PARAM_IDS_V1];
       prefs.getBytes("profile", old, sizeof(old));
