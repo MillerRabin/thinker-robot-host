@@ -67,12 +67,15 @@ constexpr uint32_t LEARN_MAX_MS = 5000;    // a window still open this long ends
 constexpr int LEARN_MIN_SAMPLES = 5;       // INTERVAL_MS each
 const int LEARN_JOINTS[] = {SHOULDER_Y, ELBOW_Y, WRIST_Y};
 // The kinds: [0] lifting the way of growing angles, [1] lifting the other way, [2] lowering the way of
-// growing angles, [3] lowering the other way - lifting against the gravity torque at the start. By the
+// growing angles, [3] lowering the other way - lifting against the gravity torque at the start - and
+// [4], [5] the same two ways from near balance (LEARN_MIN_LOAD), where lifting or lowering isn't
+// told. Those learned nothing before: measured live (2026-11-27, four cycles), from vertical to park
+// the elbow ended 1.7-2.0deg past every time and the shoulder crept 0.9-1.5 past in the second after. By the
 // way alone, two moves wanting different shifts shared one: measured live (2026-11-27, four learning
 // cycles vertical -> park -> down -> park -> vertical), the wrist's lifts down from park and back from
 // "down" ran ~1 and ~3deg past and its shift settled at ~1.8 (one ended 1 short, the other 1 past),
 // the elbow's ~0.5 short and ~0.6 past at ~0.2.
-constexpr int LEARN_SLOTS = 4;
+constexpr int LEARN_SLOTS = 6;
 float learned[N][LEARN_SLOTS] = {};
 // The parking pose ({"home": true}), picked by the user on 2026-11-21 (the platform on a table corner):
 // the upper arm 80deg out toward +x, the forearm upright, the wrist level toward -x and the claw
@@ -529,23 +532,23 @@ bool start(const Request &q, JsonObject reply) {
     planGoal[j] = goal.angles[j];
   }
   planGoalKept = true;
-  // Learned per way: [0] lifting (against the gravity torque at the start), [1] lowering - the way of
-  // a joint's travel decides nothing on its own once the arm works on both sides of vertical. A joint
-  // starting near balance (LEARN_MIN_LOAD) learns nothing.
+  // Learned per kind of move (see LEARN_SLOTS): lifting (against the gravity torque at the start) or
+  // lowering, or from near balance (LEARN_MIN_LOAD), and which way.
   float load0[3];
   gravityLoads(a0, load0);
   for (int i = 0; i < 3; i++) {
     const int j = LOAD_JOINTS[i];
     const float travel = (goal.angles[j] - a0[j]) / DEG;
-    const bool lift = travel * load0[i] < 0.0f;
+    const bool balance = std::fabs(load0[i]) < LEARN_MIN_LOAD;
+    const bool lift = !balance && travel * load0[i] < 0.0f;
     // Not the shoulder on a lift (the way back up): measured live (2026-11-17), it ended 0.8-0.9deg
     // past whatever the shift - 0, 0.32, 0.69, 1.00 - until at 1.97 it stopped 2.2deg short: the shift
     // only moved it across its backlash, and the settle after it took the claw 40 mm away.
     if (j == SHOULDER_Y && lift) {
       continue;
     }
-    if (q.learn && std::fabs(travel) >= LEARN_MIN_TRAVEL_DEG && std::fabs(load0[i]) >= LEARN_MIN_LOAD) {
-      planWay[j] = (lift ? 0 : 2) + (travel > 0.0f ? 0 : 1);
+    if (q.learn && std::fabs(travel) >= LEARN_MIN_TRAVEL_DEG) {
+      planWay[j] = (balance ? 4 : lift ? 0 : 2) + (travel > 0.0f ? 0 : 1);
       planDir[j] = travel > 0.0f ? 1.0f : -1.0f;
       planShift[j] = learned[j][planWay[j]] * planDir[j];
     }
@@ -663,7 +666,7 @@ void begin() {
   Server.addHandler(move);
 
   // Sets the learned end-of-move overshoot (it lives in RAM, so a reboot forgets it): {"shoulder-y":
-  // [lift up, lift down, lower up, lower down] (see LEARN_SLOTS), "elbow-y": [...], "wrist-y": [...]},
+  // [lift up, lift down, lower up, lower down, balance up, balance down] (see LEARN_SLOTS), "elbow-y": [...], "wrist-y": [...]},
   // any of them, deg along the joint's travel (+ = ran past the goal, see planDir); replies with all.
   auto *learn = new AsyncCallbackJsonWebHandler("/learn", [](AsyncWebServerRequest *request, JsonVariant json) {
     DynamicJsonDocument doc(512);
